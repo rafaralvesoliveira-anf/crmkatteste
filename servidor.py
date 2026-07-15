@@ -163,6 +163,27 @@ def por_unidade():
                      f'ecossistema {r.eco:.0f}%, aptos {int(r.aptos)}'
                      for u, r in g.sort_values("receita", ascending=False).iterrows())
 
+def assessores_por_unidade():
+    g = cli.groupby(["unidade", "assessor"]).agg(
+        clientes=("cliente_id", "count"), AUC=("patrimonio_investimentos_safra", "sum"),
+        receita=("receita_total_12m", "sum"))
+    out = []
+    for uni in UNIDADES:
+        if uni not in g.index.get_level_values(0):
+            continue
+        out.append(f"{uni}:")
+        for (_, a), r in g.loc[[uni]].sort_values("receita", ascending=False).iterrows():
+            out.append(f"  - {a}: {int(r.clientes)} clientes, AUC {brl(r.AUC)}, receita 12m {brl(r.receita)}")
+    return "\n".join(out)
+
+def receita_por_unidade():
+    g = cli.groupby("unidade").agg(
+        inv=("receita_investimentos_12m", "sum"), seg=("receita_seguros_12m", "sum"),
+        con=("receita_consorcio_12m", "sum"), cam=("receita_cambio_12m", "sum"),
+        cred=("receita_credito_12m", "sum")).sort_values("seg", ascending=False)
+    return "\n".join(f"- {u}: Seguros {brl(r.seg)}, Consórcio {brl(r.con)}, Câmbio {brl(r.cam)}, "
+                     f"Crédito {brl(r.cred)}, Investimentos {brl(r.inv)}" for u, r in g.iterrows())
+
 def ids_de(scope, ent=None):
     if scope == "assessor" and ent in nome_assessor:
         return set(cli[cli["assessor_id"] == ent]["cliente_id"])
@@ -190,6 +211,8 @@ def contexto_de(scope, ent=None):
             + "\n\nECOSSISTEMA — SERVIÇOS ATIVOS:\n" + ecossistema_resumo(ids, top=20))
     else:
         ctx = (resumo(ids_all, "VISÃO GESTÃO — KAT (5 unidades, 20 assessores)") + "\nPOR UNIDADE:\n" + por_unidade()
+            + "\n\nRECEITA POR UNIDADE E SEGMENTO (12m):\n" + receita_por_unidade()
+            + "\n\nASSESSORES POR UNIDADE:\n" + assessores_por_unidade()
             + "\n\nPRÓXIMOS VENCIMENTOS (45 dias, data-base 15/07/2026):\n" + proximos_vencimentos(ids_all, 45)
             + "\n\nECOSSISTEMA — SERVIÇOS ATIVOS:\n" + ecossistema_resumo(ids_all, top=20))
     _ctx_cache[key] = ctx
