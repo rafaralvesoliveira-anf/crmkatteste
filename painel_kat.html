@@ -1,0 +1,511 @@
+<meta charset="utf-8">
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#eef1f4; --card:#ffffff; --ink:#0f1e1b; --ink2:#5b6b67; --ink3:#8a9793;
+    --kat:#1f4a43; --kat2:#2e5c50; --gold:#c4a461; --line:#e6eaed;
+    --rose:#f43f5e; --roseb:#ffe4e8; --amber:#f59e0b; --amberb:#fef3c7;
+    --teal:#14b8a6; --tealb:#d3f3ee; --emerald:#10b981; --emeraldb:#d1fae5;
+    --blue:#3b82f6; --blueb:#dbeafe; --violet:#8b5cf6; --violetb:#ede9fe;
+    --shadow:0 1px 2px rgba(16,30,28,.05),0 6px 18px rgba(16,30,28,.06);
+  }
+  @media (prefers-color-scheme:dark){:root{
+    --bg:#0c1413; --card:#13201d; --ink:#eaf2ef; --ink2:#9db0aa; --ink3:#6d827c;
+    --line:#213330; --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.35);
+    --roseb:#3a1620;--amberb:#3a2c0f;--tealb:#0e2e2a;--emeraldb:#0d2a20;--blueb:#12233f;--violetb:#231a3a;
+  }}
+  :root[data-theme="dark"]{
+    --bg:#0c1413; --card:#13201d; --ink:#eaf2ef; --ink2:#9db0aa; --ink3:#6d827c;
+    --line:#213330; --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.35);
+    --roseb:#3a1620;--amberb:#3a2c0f;--tealb:#0e2e2a;--emeraldb:#0d2a20;--blueb:#12233f;--violetb:#231a3a;
+  }
+  :root[data-theme="light"]{
+    --bg:#eef1f4; --card:#ffffff; --ink:#0f1e1b; --ink2:#5b6b67; --line:#e6eaed;
+    --roseb:#ffe4e8;--amberb:#fef3c7;--tealb:#d3f3ee;--emeraldb:#d1fae5;--blueb:#dbeafe;--violetb:#ede9fe;
+  }
+  html,body{background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+  /* top bar */
+  header.top{position:sticky;top:0;z-index:30;background:var(--kat)}
+  .headinner{max-width:1320px;margin:0 auto;display:flex;align-items:center;gap:24px;padding:14px 28px}
+  .logo{display:flex;flex-direction:column;line-height:1;flex-shrink:0}
+  .logo .k{font-weight:800;font-size:27px;letter-spacing:5px;color:var(--gold)}
+  .logo .i{font-size:11px;letter-spacing:6px;color:#fff;margin-top:5px;font-weight:400;padding-left:2px}
+  .switch{display:flex;gap:4px;background:rgba(255,255,255,.12);border-radius:13px;padding:4px;margin:0 auto}
+  .switch button{border:0;background:transparent;color:rgba(255,255,255,.72);font-weight:600;font-size:13px;
+    padding:9px 22px;border-radius:9px;cursor:pointer;font-family:inherit;transition:.15s}
+  .switch button.on{background:#fff;color:var(--kat)}
+  .who{display:flex;align-items:center;gap:12px;flex-shrink:0}
+  .who .txt{text-align:right}
+  .who .txt .n{font-size:14px;font-weight:700;color:#fff}
+  .who .txt .d{font-size:11px;color:rgba(255,255,255,.7)}
+  .av{width:38px;height:38px;border-radius:50%;background:var(--gold);color:#3a2e12;display:grid;place-items:center;font-weight:800;font-size:15px}
+  /* grid */
+  .dash{max-width:1320px;margin:0 auto;padding:22px 28px 60px;display:flex;flex-direction:column;gap:22px}
+  .cardsrow{display:grid;grid-template-columns:1fr 1fr 1fr;gap:22px;align-items:stretch}
+  .lower{display:grid;grid-template-columns:minmax(360px,1fr) 1.55fr;gap:22px;align-items:start}
+  .leftcol{display:flex;flex-direction:column;gap:16px}
+  @media (max-width:1000px){.cardsrow{grid-template-columns:1fr}.lower{grid-template-columns:1fr}}
+  .block{display:flex;flex-direction:column}
+  .blockhd{display:flex;align-items:center;gap:8px;margin:0 2px 12px}
+  .blockhd h2{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.7px;color:var(--kat)}
+  .tag{font-size:9.5px;font-weight:800;letter-spacing:.5px;background:var(--gold);color:#3a2e12;padding:2px 6px;border-radius:6px}
+  .tag.soft{background:var(--tealb);color:var(--kat)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  /* card column — makes the 3 blocks equal height */
+  .cardcol{flex:1;display:flex;flex-direction:column;gap:12px}
+  .cardcol.inv > *{flex:1 1 auto}
+  .cardcol.prosp > .funnelcard{flex:1 1 auto;display:flex;align-items:center}
+  .cardcol.eco > .ecogrid{flex:1 1 auto}
+  .ecogrid{grid-auto-rows:1fr}
+  /* pill card */
+  .pill{position:relative;overflow:hidden;border-radius:20px;background:var(--card);box-shadow:var(--shadow);
+    padding:14px 16px;min-height:84px;isolation:isolate;display:flex;flex-direction:column;justify-content:center}
+  .pill.row{flex-direction:row;align-items:center;gap:14px}
+  .pill .fill{position:absolute;inset:0;z-index:-1;opacity:.9;transition:width .6s cubic-bezier(.3,1,.4,1)}
+  .pill .ico{width:40px;height:40px;border-radius:13px;display:grid;place-items:center;background:rgba(255,255,255,.72);flex-shrink:0}
+  :root[data-theme="dark"] .pill .ico{background:rgba(255,255,255,.14)}
+  @media (prefers-color-scheme:dark){.pill .ico{background:rgba(255,255,255,.14)}}
+  .pill .ico svg{width:21px;height:21px}
+  .pill .lbl{font-size:12.5px;font-weight:600;color:var(--ink2)}
+  .pill .val{font-size:24px;font-weight:800;letter-spacing:-.5px;line-height:1.05}
+  .pill .val small{font-size:15px;font-weight:700;color:var(--ink2)}
+  .pill .foot{font-size:10.5px;color:var(--ink3);margin-top:2px}
+  /* ring */
+  .ring{align-items:center;justify-content:center;text-align:center;gap:2px}
+  .ring .rlbl{font-size:12px;font-weight:700;color:var(--ink2)}
+  .ring .rval{font-size:11px;color:var(--ink3);font-weight:600}
+  .ringwrap{position:relative;width:104px;height:104px}
+  .ringwrap svg{display:block;width:104px;height:104px}
+  .ringwrap .pct{position:absolute;inset:0;display:grid;place-items:center;font-size:25px;font-weight:800;letter-spacing:-1px}
+  /* funnel */
+  .funnel{display:flex;flex-direction:column;align-items:center;width:100%}
+  .fbar{position:relative;height:40px;border-radius:11px;display:flex;align-items:center;justify-content:space-between;
+    padding:0 15px;color:#fff;box-shadow:var(--shadow)}
+  .fbar .fn{font-size:12px;opacity:.95;font-weight:600}
+  .fbar .fv{font-size:17px;font-weight:800}
+  .conv{font-size:10px;color:var(--ink3);font-weight:700;padding:3px 0}
+  .conv b{color:var(--kat)}
+  /* pontos urgentes */
+  .periodsw{display:flex;gap:4px;background:var(--line);border-radius:11px;padding:3px}
+  .periodsw button{border:0;background:transparent;color:var(--ink2);font-weight:700;font-size:11.5px;padding:6px 15px;border-radius:8px;cursor:pointer;font-family:inherit}
+  .periodsw button.on{background:var(--card);color:var(--kat);box-shadow:var(--shadow)}
+  .urgbody{min-height:280px}
+  .ugrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;align-content:start}
+  .urg{display:flex;align-items:center;gap:12px;background:var(--card);border-radius:16px;padding:13px 15px;box-shadow:var(--shadow)}
+  .urg .bar{width:4px;align-self:stretch;border-radius:4px}
+  .urg .ti{flex:1;min-width:0}
+  .urg .ti .t{font-size:13.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .urg .ti .c{font-size:11.5px;color:var(--ink3)}
+  .urg .chip{font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;padding:3px 8px;border-radius:7px;white-space:nowrap}
+  .urg .when{font-size:10px;color:var(--ink3);font-weight:600;white-space:nowrap;margin-top:4px;display:block;text-align:right}
+  .ucols{display:grid;gap:12px}
+  .ucol{background:var(--bg);border-radius:16px;padding:11px;min-height:260px}
+  .ucol.on{outline:2px solid var(--gold);outline-offset:-1px}
+  .ucolhd{display:flex;justify-content:space-between;align-items:center;font-size:11px;font-weight:800;color:var(--kat);text-transform:uppercase;letter-spacing:.3px;margin-bottom:9px;padding:0 2px}
+  .ucolhd span{background:var(--kat);color:#fff;border-radius:8px;padding:1px 7px;font-size:10px}
+  .ucolbody{display:flex;flex-direction:column;gap:8px}
+  .umini{background:var(--card);border-left:4px solid;border-radius:11px;padding:9px 10px;box-shadow:var(--shadow)}
+  .umt{font-size:12px;font-weight:700;line-height:1.25}
+  .umc{font-size:10.5px;color:var(--ink3);margin-top:2px}
+  .umchip{display:inline-block;margin-top:6px;font-size:8.5px;font-weight:800;text-transform:uppercase;letter-spacing:.3px;padding:2px 6px;border-radius:6px}
+  .uempty{color:var(--ink3);font-size:11px;text-align:center;padding:14px 0}
+  .hsub{font-size:11px;color:var(--ink3);font-weight:600;text-transform:none;letter-spacing:0;margin-left:8px}
+  .ucards{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;align-content:start}
+  .ccard{background:var(--card);border-radius:16px;padding:14px;box-shadow:var(--shadow)}
+  .cchd{display:flex;justify-content:space-between;align-items:center;margin-bottom:11px}
+  .cchd span:first-child{font-size:13.5px;font-weight:800;color:var(--ink)}
+  .cctot{background:var(--kat);color:#fff;border-radius:9px;padding:2px 9px;font-size:12px;font-weight:800}
+  .ccrow{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .cstat{border-radius:12px;padding:9px 11px;display:flex;flex-direction:column;gap:2px}
+  .cstat .cv{font-size:20px;font-weight:800;line-height:1}
+  .cstat .cl{font-size:9px;font-weight:700;color:var(--ink2);text-transform:uppercase;letter-spacing:.2px}
+  /* actions */
+  .actions{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .actions button{border:0;border-radius:18px;padding:16px;font-family:inherit;font-weight:700;font-size:14px;
+    display:flex;align-items:center;justify-content:center;gap:9px;cursor:pointer;box-shadow:var(--shadow)}
+  .btn-reg{background:var(--kat);color:#fff}
+  .btn-meet{background:var(--card);color:var(--kat);border:1.5px solid var(--kat)!important}
+  /* AI */
+  .ai{background:var(--card);border-radius:22px;box-shadow:var(--shadow);padding:20px}
+  .ai .hi{font-size:16px;font-weight:800;display:flex;align-items:center;gap:8px}
+  .spark{color:var(--gold)}
+  .ai .sub{font-size:12.5px;color:var(--ink2);margin:7px 0 12px}
+  .sugg{display:flex;flex-direction:column;gap:7px;margin-bottom:13px}
+  .sugg button{text-align:left;border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:12px;
+    padding:11px 13px;font-size:13px;font-family:inherit;cursor:pointer;display:flex;gap:9px;align-items:center;transition:.15s}
+  .sugg button:hover{border-color:var(--gold);background:rgba(196,164,97,.06)}
+  .aimsgs{display:flex;flex-direction:column;gap:9px;margin-bottom:12px;max-height:360px;overflow-y:auto}
+  .aimsgs:empty{display:none}
+  .aimsg{padding:11px 14px;border-radius:15px;font-size:13px;line-height:1.55;white-space:pre-wrap;word-wrap:break-word}
+  .aimsg.user{background:var(--kat);color:#fff;align-self:flex-end;max-width:88%;border-bottom-right-radius:5px}
+  .aimsg.ai{background:var(--bg);color:var(--ink);align-self:flex-start;max-width:94%;border-bottom-left-radius:5px}
+  .aimsg.loading{opacity:.55}
+  .aimsg code{background:rgba(0,0,0,.06);padding:1px 5px;border-radius:5px;font-size:12px}
+  .aibar{display:flex;align-items:center;gap:9px;background:var(--bg);border-radius:14px;padding:7px 7px 7px 16px}
+  .aibar input{flex:1;border:0;background:transparent;color:var(--ink);font-size:13.5px;font-family:inherit;outline:none}
+  .aibar .mic,.aibar .snd{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;cursor:pointer;border:0}
+  .aibar .mic{background:var(--card);color:var(--kat)}
+  .aibar .snd{background:var(--kat);color:#fff}
+  .chats{margin-top:12px;border-top:1px solid var(--line);padding-top:12px}
+  .chats .ch-h{font-size:11px;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:7px;display:flex;align-items:center;gap:6px}
+  .chats a{display:flex;align-items:center;justify-content:space-between;padding:8px 2px;font-size:13px;color:var(--ink);cursor:pointer;border-bottom:1px solid var(--line);text-decoration:none}
+  .chats a:last-child{border-bottom:0}
+  .chats a .d{font-size:11px;color:var(--ink3)}
+  /* feed */
+  .feedhd{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.7px;color:var(--kat);margin:0 2px 4px;display:flex;align-items:center;gap:8px}
+  .daylbl{display:flex;align-items:center;gap:10px;margin:14px 2px 10px;color:var(--ink3);font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.6px}
+  .daylbl::before,.daylbl::after{content:"";height:1px;background:var(--line);flex:1}
+  .notif{background:var(--card);border-radius:20px;box-shadow:var(--shadow);padding:17px 19px;margin-bottom:11px}
+  .notif .nh{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--ink3);font-weight:700}
+  .notif h3{font-size:15.5px;font-weight:800;margin:8px 0 6px;line-height:1.28;text-wrap:balance}
+  .notif p{font-size:13.5px;color:var(--ink2);line-height:1.55}
+  .notif .reply{margin-top:12px;display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:transparent;
+    color:var(--kat);font-weight:700;font-size:12px;padding:8px 14px;border-radius:12px;cursor:pointer;font-family:inherit}
+  /* sheet */
+  .ovl{position:fixed;inset:0;background:rgba(8,16,15,.5);display:none;align-items:center;justify-content:center;z-index:50}
+  .ovl.open{display:flex}
+  .sheet{background:var(--card);width:100%;max-width:640px;border-radius:24px;padding:22px 24px 26px;animation:up .22s ease;position:relative}
+  .clic{cursor:pointer;transition:.12s}
+  .clic:hover{outline:2px solid var(--gold);outline-offset:-1px}
+  .dsub{font-size:12.5px;color:var(--ink2);margin:-4px 0 12px}
+  .dtabwrap{max-height:58vh;overflow:auto;border:1px solid var(--line);border-radius:12px}
+  .dtab{width:100%;border-collapse:collapse;font-size:12.5px}
+  .dtab th{position:sticky;top:0;background:var(--bg);text-align:left;padding:9px 12px;font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink3);font-weight:800;white-space:nowrap}
+  .dtab th.tr,.dtab td:not(.c0):last-child{white-space:nowrap}
+  .dtab td{padding:9px 12px;border-top:1px solid var(--line);color:var(--ink)}
+  .dtab td.c0{font-weight:700}
+  .dchip{font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.3px;padding:2px 7px;border-radius:6px;white-space:nowrap}
+  .drod{margin-top:12px;font-size:13px;font-weight:700;color:var(--kat)}
+  @keyframes up{from{transform:translateY(14px);opacity:.6}to{transform:none;opacity:1}}
+  .sheet h4{font-size:16px;font-weight:800;margin-bottom:14px}
+  .optrow{display:flex;gap:14px;justify-content:space-between;margin-bottom:8px}
+  .opt{flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer}
+  .opt .ob{width:64px;height:64px;border-radius:20px;background:var(--bg);display:grid;place-items:center;color:var(--kat)}
+  .opt .ol{font-size:12px;font-weight:600;color:var(--ink2)}
+  .sheet .divider{height:1px;background:var(--line);margin:16px 0}
+  .manual{display:flex;flex-wrap:wrap;gap:9px}
+  .manual button{border:0;background:var(--bg);color:var(--ink);border-radius:14px;padding:12px 16px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer}
+  .meetbox textarea{width:100%;border:1px solid var(--line);border-radius:14px;background:var(--bg);color:var(--ink);
+    padding:13px;font-family:inherit;font-size:13.5px;min-height:100px;resize:vertical;outline:none}
+  .meetbox .rec{display:flex;align-items:center;gap:10px;margin-top:13px}
+  .meetbox .recbtn{flex:1;background:var(--kat);color:#fff;border:0;border-radius:14px;padding:14px;font-weight:700;font-family:inherit;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px}
+  .close{position:absolute;top:16px;right:18px;background:transparent;border:0;color:var(--ink3);cursor:pointer;font-size:22px;line-height:1}
+  .toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:var(--kat);color:#fff;
+    padding:12px 20px;border-radius:14px;font-size:13.5px;font-weight:600;box-shadow:var(--shadow);z-index:60;opacity:0;transition:.3s;pointer-events:none}
+  .toast.show{opacity:1}
+  button:focus-visible,a:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<header class="top">
+  <div class="headinner">
+    <div class="logo"><span class="k">KAT</span><span class="i">INVESTIMENTOS</span></div>
+    <div class="switch" id="switch">
+      <button data-s="assessor" class="on">Assessor</button>
+      <button data-s="lider">Team Leader</button>
+      <button data-s="gestao">Gestão</button>
+    </div>
+    <div class="who">
+      <div class="txt"><div class="n" id="scopeNome">—</div><div class="d" id="scopeDesc">—</div></div>
+      <div class="av" id="av">r</div>
+    </div>
+  </div>
+</header>
+
+<main class="dash" id="app"></main>
+
+<div class="ovl" id="ovl"><div class="sheet" id="sheet"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+const DATA = {"assessor": {"nivel": "Assessor", "nome": "Sofia Costa", "primeiro": "Sofia", "escopo_desc": "Sua carteira · São Paulo", "n_clientes": 19, "n_assessores": 1, "pl": 17601607, "investimentos": {"oportunidades": {"feito": 3, "total": 5}, "vencimentos": {"feito": 3, "total": 4}, "reunioes": {"feito": 5, "total": 6}, "receita": {"pct": 121, "valor": 13273, "roa": 0.9}}, "prospeccao": {"funil": [{"fase": "Novos prospects", "valor": 12}, {"fase": "R1", "valor": 7}, {"fase": "R2", "valor": 4}, {"fase": "Contas abertas", "valor": 3}], "conversoes": [58, 57, 75], "captacao": {"valor": 933000, "meta": 1000000, "pct": 93}}, "ecossistema": {"seguros": 5, "cambio": 2, "consorcio": 0, "credito_pf": 4, "receita": {"pct": 97, "valor": 9666, "meta": 10000}}, "urgentes": {"modo": "itens", "dia": [{"tipo": "Reunião", "cor": "violet", "titulo": "Revisão de planejamento", "cliente": "Isabela Duarte Carvalho", "quando": "Hoje"}, {"tipo": "Oportunidade", "cor": "emerald", "titulo": "Fundo internacional sugerido", "cliente": "Sandra Andrade Carvalho", "quando": "Hoje"}, {"tipo": "Tarefa", "cor": "amber", "titulo": "Atualizar suitability (vence este mês)", "cliente": "Beatriz Barros Costa", "quando": "Hoje"}, {"tipo": "Oportunidade", "cor": "emerald", "titulo": "Cross-sell de câmbio", "cliente": "Rafael Guimarães Rangel", "quando": "Hoje"}], "semana": {"Seg 13/07": [{"tipo": "Oportunidade", "cor": "emerald", "titulo": "Sub-alocado em RF", "cliente": "Roberto Andrade Vieira", "quando": "Seg"}], "Ter 14/07": [{"tipo": "Vencimento", "cor": "rose", "titulo": "CRA a reaplicar · R$ 210 mil", "cliente": "Débora Teixeira Costa", "quando": "Ter"}], "Qua 15/07 · hoje": [{"tipo": "Tarefa", "cor": "amber", "titulo": "Atualizar suitability (vence este mês)", "cliente": "Eduardo Pinheiro Mendes", "quando": "Qua"}, {"tipo": "Vencimento", "cor": "rose", "titulo": "Tesouro a reaplicar · R$ 47 mil", "cliente": "Tatiane Domingues Prado", "quando": "Qua"}], "Qui 16/07": [{"tipo": "Tarefa", "cor": "amber", "titulo": "Enviar relatório mensal", "cliente": "Rodrigo Queiroz Moreira", "quando": "Qui"}, {"tipo": "Oportunidade", "cor": "emerald", "titulo": "Sub-alocado em RF", "cliente": "Mariana Melo Domingues", "quando": "Qui"}, {"tipo": "Reunião", "cor": "violet", "titulo": "Acompanhamento trimestral", "cliente": "Aline Vasconcelos Braga", "quando": "Qui"}], "Sex 17/07": [{"tipo": "Oportunidade", "cor": "emerald", "titulo": "Sub-alocado em RF", "cliente": "Kátia Queiroz Rocha", "quando": "Sex"}]}, "mes": {"Sem 1 · 01–07": [{"tipo": "Oportunidade", "cor": "emerald", "titulo": "Oferta de COE (prazo curto)", "cliente": "Lívia Vieira Domingues", "quando": "01–07/07"}], "Sem 2 · 08–14": [{"tipo": "Vencimento", "cor": "rose", "titulo": "Debênture vencendo · R$ 68 mil", "cliente": "Tatiane Mendes Teixeira", "quando": "08–14/07"}, {"tipo": "Vencimento", "cor": "rose", "titulo": "Debênture vencendo · R$ 68 mil", "cliente": "Débora Prado Moreira", "quando": "08–14/07"}, {"tipo": "Tarefa", "cor": "amber", "titulo": "Enviar simulação de previdência", "cliente": "Camila Ferreira Iwamoto", "quando": "08–14/07"}], "Sem 3 · 15–21 · atual": [{"tipo": "Reunião", "cor": "violet", "titulo": "Revisão de planejamento", "cliente": "Nelson Queiroz Andrade", "quando": "15–21/07"}, {"tipo": "Oportunidade", "cor": "emerald", "titulo": "Oferta de COE (prazo curto)", "cliente": "Débora Prado Braga", "quando": "15–21/07"}], "Sem 4 · 22–28": [{"tipo": "Vencimento", "cor": "rose", "titulo": "CDB IPCA+ vencendo · R$ 152 mil", "cliente": "Eduardo Bittencourt Rocha", "quando": "22–28/07"}, {"tipo": "Oportunidade", "cor": "emerald", "titulo": "Cross-sell de câmbio", "cliente": "Isabela Duarte Carvalho", "quando": "22–28/07"}], "Sem 5 · 29–31": [{"tipo": "Oportunidade", "cor": "emerald", "titulo": "Oferta de COE (prazo curto)", "cliente": "Sandra Andrade Carvalho", "quando": "29–31/07"}, {"tipo": "Oportunidade", "cor": "emerald", "titulo": "Fundo internacional sugerido", "cliente": "Beatriz Barros Costa", "quando": "29–31/07"}, {"tipo": "Tarefa", "cor": "amber", "titulo": "Atualizar suitability (vence este mês)", "cliente": "Rafael Guimarães Rangel", "quando": "29–31/07"}]}}, "detalhe": {"oportunidades": {"titulo": "Oportunidades — 3/5", "subtitulo": "Realocações da mesa no mês", "colunas": ["Cliente", "Produto", "Status"], "linhas": [["Sandra Andrade Carvalho", "PGBL Icatu", "Realizada"], ["Eduardo Pinheiro Mendes", "Fundo Cambial", "Realizada"], ["Débora Prado Moreira", "Tesouro Prefixado 2031", "Realizada"], ["Rafael Guimarães Rangel", "CDB Pré 2028", "Pendente"], ["Eduardo Bittencourt Rocha", "Tesouro Prefixado 2031", "Pendente"]], "rodape": ""}, "vencimentos": {"titulo": "Vencimentos — 3/4", "subtitulo": "Reaplicações no mês", "colunas": ["Cliente", "Ativo", "Valor", "Status"], "linhas": [["Mariana Melo Domingues", "CDB Banco Master IPCA+", "R$ 60 mil", "Reaplicado"], ["Débora Prado Braga", "LCA Safra 96% CDI", "R$ 610 mil", "Reaplicado"], ["Nelson Queiroz Andrade", "Tesouro IPCA+ 2029", "R$ 280 mil", "Reaplicado"], ["Roberto Andrade Vieira", "LCI Bradesco 92% CDI", "R$ 240 mil", "Atrasado"]], "rodape": ""}, "reunioes": {"titulo": "Reuniões — 5/6", "subtitulo": "Meta de 4 reuniões por cliente ao ano", "colunas": ["Cliente", "Tipo", "Status"], "linhas": [["Lívia Vieira Domingues", "Acompanhamento trimestral", "Feita"], ["Kátia Queiroz Rocha", "Acompanhamento trimestral", "Feita"], ["Débora Teixeira Costa", "Acompanhamento trimestral", "Feita"], ["Rodrigo Queiroz Moreira", "Contato mensal", "Feita"], ["Aline Vasconcelos Braga", "Acompanhamento trimestral", "Feita"], ["Tatiane Mendes Teixeira", "R1", "Pendente"]], "rodape": ""}, "receita": {"titulo": "Receita de investimentos — 121% da meta", "subtitulo": "Meta de ROA 0,75% · maiores geradores de receita", "colunas": ["Cliente", "Receita/mês", "ROA"], "linhas": [["Rafael Guimarães Rangel", "R$ 3 mil", "0.99%"], ["Débora Teixeira Costa", "R$ 2 mil", "0.98%"], ["Camila Ferreira Iwamoto", "R$ 2 mil", "1.07%"], ["Beatriz Barros Costa", "R$ 1 mil", "0.74%"], ["Eduardo Bittencourt Rocha", "R$ 1 mil", "1.06%"], ["Aline Vasconcelos Braga", "R$ 886", "0.68%"], ["Kátia Queiroz Rocha", "R$ 454", "0.74%"], ["Débora Prado Moreira", "R$ 450", "0.67%"], ["Rodrigo Queiroz Moreira", "R$ 445", "0.64%"], ["Lívia Vieira Domingues", "R$ 379", "1.15%"], ["Mariana Melo Domingues", "R$ 348", "1.04%"], ["Tatiane Domingues Prado", "R$ 341", "1.25%"], ["Nelson Queiroz Andrade", "R$ 320", "0.89%"], ["Sandra Andrade Carvalho", "R$ 203", "0.97%"]], "rodape": "Total no mês: R$ 13 mil · ROA da carteira 0.9%"}, "prospeccao": {"titulo": "Funil de prospecção — mês", "subtitulo": "Quantidade por fase", "colunas": ["Fase", "Quantidade"], "linhas": [["Novos prospects", "12"], ["R1", "7"], ["R2", "4"], ["Contas abertas", "3"], ["Captação líquida", "R$ 933 mil"]], "rodape": "Meta de captação R$ 1.0 mi · 93% atingido"}, "captacao": {"titulo": "Captação líquida — 93% da meta", "subtitulo": "Contas abertas / aportes no mês", "colunas": ["Cliente", "Aporte"], "linhas": [["Tatiane Domingues Prado", "R$ 99 mil"], ["Camila Ferreira Iwamoto", "R$ 116 mil"], ["Beatriz Barros Costa", "R$ 259 mil"]], "rodape": "Total R$ 933 mil de R$ 1.0 mi"}, "seguros": {"titulo": "Seguros — 5 em aberto", "subtitulo": "Negócios em aberto no ecossistema", "colunas": ["Cliente", "Tipo", "Instituição", "Valor ref.", "Status"], "linhas": [["Isabela Duarte Carvalho", "Vida", "SulAmérica", "R$ 74 mil", "Em negociação"], ["Sandra Andrade Carvalho", "Patrimonial", "MetLife", "R$ 226 mil", "Em negociação"], ["Eduardo Pinheiro Mendes", "Saúde", "Prudential", "R$ 391 mil", "Em negociação"], ["Débora Prado Moreira", "Patrimonial", "SulAmérica", "R$ 73 mil", "Aguardando"], ["Rafael Guimarães Rangel", "Patrimonial", "Icatu", "R$ 173 mil", "Aguardando"]], "rodape": ""}, "cambio": {"titulo": "Câmbio — 2 em aberto", "subtitulo": "Negócios em aberto no ecossistema", "colunas": ["Cliente", "Tipo", "Instituição", "Valor ref.", "Status"], "linhas": [["Eduardo Bittencourt Rocha", "Turismo", "Oribank", "R$ 363 mil", "Em negociação"], ["Mariana Melo Domingues", "Comercial", "Safra", "R$ 232 mil", "Proposta enviada"]], "rodape": ""}, "consorcio": {"titulo": "Consórcio — 0 em aberto", "subtitulo": "Negócios em aberto no ecossistema", "colunas": ["Cliente", "Tipo", "Instituição", "Valor ref.", "Status"], "linhas": [], "rodape": ""}, "credito_pf": {"titulo": "Crédito PF — 4 em aberto", "subtitulo": "Negócios em aberto no ecossistema", "colunas": ["Cliente", "Tipo", "Instituição", "Valor ref.", "Status"], "linhas": [["Débora Prado Braga", "Fin. Imóvel", "Itaú", "R$ 267 mil", "Em negociação"], ["Nelson Queiroz Andrade", "Fin. Imóvel", "Safra", "R$ 142 mil", "Em negociação"], ["Roberto Andrade Vieira", "Fin. Veículo", "Bradesco", "R$ 165 mil", "Aguardando"], ["Lívia Vieira Domingues", "Crédito c/ garantia", "Bradesco", "R$ 45 mil", "Aguardando"]], "rodape": ""}, "receita_eco": {"titulo": "Receita do ecossistema — 97% da meta", "subtitulo": "Receita no mês por segmento", "colunas": ["Segmento", "Receita/mês"], "linhas": [["Seguros", "R$ 5 mil"], ["Consórcio", "R$ 2 mil"], ["Câmbio", "R$ 506"], ["Crédito", "R$ 3 mil"]], "rodape": "Total R$ 10 mil de R$ 10 mil"}}, "sugestoes": ["Quais clientes meus estão sem contato há mais de 30 dias?", "Quem tem vencimento nos próximos 7 dias e ainda não foi contatado?", "Sugira 3 oportunidades de cross-sell na minha carteira."], "chats": [{"data": "Hoje", "titulo": "Clientes sem contato no mês"}, {"data": "Ontem", "titulo": "Preparação da reunião — Carlos E. Mendes"}, {"data": "12/07", "titulo": "Ideias de realocação pós-Copom"}], "notificacoes": [{"quando": "Hoje", "hora": "08:00", "titulo": "Comece pelo que vence", "corpo": "3 clientes têm vencimento nos próximos 5 dias somando R$ 310 mil. Priorize o contato hoje para garantir a reaplicação antes da liquidação."}, {"quando": "Hoje", "hora": "18:00", "titulo": "Fechou o dia bem", "corpo": "2 oportunidades da mesa foram concluídas hoje. Faltam 5 para bater a meta tática do mês; 3 têm prazo esta semana."}, {"quando": "Ontem", "hora": "08:00", "titulo": "Comece pelo que vence", "corpo": "3 clientes têm vencimento nos próximos 5 dias somando R$ 310 mil. Priorize o contato hoje para garantir a reaplicação antes da liquidação."}, {"quando": "Ontem", "hora": "18:00", "titulo": "Fechou o dia bem", "corpo": "2 oportunidades da mesa foram concluídas hoje. Faltam 5 para bater a meta tática do mês; 3 têm prazo esta semana."}, {"quando": "2 dias atrás", "hora": "09:30", "titulo": "Cross-sell à vista", "corpo": "5 clientes da sua carteira estão a 1 produto de virarem aptos no ecossistema. Seguro de vida é o de maior conversão no seu perfil de base."}, {"quando": "2 dias atrás", "hora": "18:00", "titulo": "Fechou o dia bem", "corpo": "2 oportunidades da mesa foram concluídas hoje. Faltam 5 para bater a meta tática do mês; 3 têm prazo esta semana."}, {"quando": "3 dias atrás", "hora": "09:30", "titulo": "Cross-sell à vista", "corpo": "5 clientes da sua carteira estão a 1 produto de virarem aptos no ecossistema. Seguro de vida é o de maior conversão no seu perfil de base."}, {"quando": "3 dias atrás", "hora": "16:00", "titulo": "Prospecção", "corpo": "Seu funil tem 2 contas em fase de fechamento (R2). Ticket médio recente de R$ 260 mil — vale um empurrão hoje."}]}, "lider": {"nivel": "Team Leader", "nome": "Roberto Ramos", "primeiro": "Roberto", "escopo_desc": "Equipe · Unidade São Paulo (4 assessores)", "n_clientes": 65, "n_assessores": 4, "pl": 49983489, "investimentos": {"oportunidades": {"feito": 7, "total": 9}, "vencimentos": {"feito": 2, "total": 4}, "reunioes": {"feito": 12, "total": 22}, "receita": {"pct": 114, "valor": 35603, "roa": 0.85}}, "prospeccao": {"funil": [{"fase": "Novos prospects", "valor": 48}, {"fase": "R1", "valor": 28}, {"fase": "R2", "valor": 13}, {"fase": "Contas abertas", "valor": 10}], "conversoes": [58, 46, 77], "captacao": {"valor": 2680000, "meta": 4000000, "pct": 67}}, "ecossistema": {"seguros": 4, "cambio": 3, "consorcio": 4, "credito_pf": 2, "receita": {"pct": 83, "valor": 33148, "meta": 40000}}, "urgentes": {"modo": "consolidado", "por": "assessor", "periodos": {"dia": [{"nome": "Roberto Ramos", "vencimentos": 0, "reunioes": 1, "tarefas": 0, "oportunidades": 1, "atrasados": 1}, {"nome": "Sofia Costa", "vencimentos": 1, "reunioes": 1, "tarefas": 1, "oportunidades": 0, "atrasados": 1}, {"nome": "Márcio Furtado", "vencimentos": 0, "reunioes": 0, "tarefas": 0, "oportunidades": 0, "atrasados": 0}, {"nome": "Aline Ortiz", "vencimentos": 1, "reunioes": 1, "tarefas": 1, "oportunidades": 1, "atrasados": 1}], "semana": [{"nome": "Roberto Ramos", "vencimentos": 2, "reunioes": 4, "tarefas": 2, "oportunidades": 3, "atrasados": 2}, {"nome": "Sofia Costa", "vencimentos": 3, "reunioes": 4, "tarefas": 3, "oportunidades": 2, "atrasados": 2}, {"nome": "Márcio Furtado", "vencimentos": 1, "reunioes": 1, "tarefas": 1, "oportunidades": 1, "atrasados": 0}, {"nome": "Aline Ortiz", "vencimentos": 4, "reunioes": 5, "tarefas": 3, "oportunidades": 3, "atrasados": 2}], "mes": [{"nome": "Roberto Ramos", "vencimentos": 6, "reunioes": 14, "tarefas": 6, "oportunidades": 10, "atrasados": 2}, {"nome": "Sofia Costa", "vencimentos": 9, "reunioes": 14, "tarefas": 10, "oportunidades": 5, "atrasados": 2}, {"nome": "Márcio Furtado", "vencimentos": 4, "reunioes": 4, "tarefas": 3, "oportunidades": 2, "atrasados": 0}, {"nome": "Aline Ortiz", "vencimentos": 13, "reunioes": 16, "tarefas": 10, "oportunidades": 10, "atrasados": 2}]}}, "detalhe": {"oportunidades": {"titulo": "Oportunidades — 7/9", "subtitulo": "Realocações da mesa no mês", "colunas": ["Cliente", "Produto", "Status"], "linhas": [["Consultoria Nova Era Ltda", "Tesouro Prefixado 2031", "Realizada"], ["Priscila Franco Martins", "CDB Pré 2028", "Realizada"], ["Mariana Melo Domingues", "COE Índices Globais", "Realizada"], ["Kátia Mendes Luz", "CDB Pré 2028", "Realizada"], ["Patrícia Mendes Rocha", "PGBL Icatu", "Realizada"], ["Transportadora Ipê S.A.", "Fundo Kapitalo Zeta", "Realizada"], ["Aline Bandeira Carvalho", "CDB Pré 2028", "Realizada"], ["Camila Ferreira Iwamoto", "COE Índices Globais", "Pendente"], ["Tatiane Domingues Prado", "Tesouro Prefixado 2031", "Pendente"]], "rodape": ""}, "vencimentos": {"titulo": "Vencimentos — 2/4", "subtitulo": "Reaplicações no mês", "colunas": ["Cliente", "Ativo", "Valor", "Status"], "linhas": [["Eduardo Pinheiro Mendes", "Debênture Sabesp", "R$ 360 mil", "Reaplicado"], ["Roberto Andrade Vieira", "CDB Banco Master IPCA+", "R$ 110 mil", "Reaplicado"], ["Camila Ribeiro Mendes", "CRI Direcional", "R$ 90 mil", "Atrasado"], ["Isabela Rocha Moreira", "LCI Bradesco 92% CDI", "R$ 560 mil", "Atrasado"]], "rodape": ""}, "reunioes": {"titulo": "Reuniões — 12/22", "subtitulo": "Meta de 4 reuniões por cliente ao ano", "colunas": ["Cliente", "Tipo", "Status"], "linhas": [["Larissa Carvalho Bittencourt", "R1", "Feita"], ["André Melo Gomes", "Revisão de planejamento", "Feita"], ["Débora Prado Braga", "R1", "Feita"], ["Leonardo Domingues Ferreira", "Acompanhamento trimestral", "Feita"], ["Construtora Ponte Alta Ltda", "R1", "Feita"], ["Nelson Queiroz Andrade", "R2", "Feita"], ["Henrique Barros Lins", "R2", "Feita"], ["Aline Vasconcelos Braga", "Contato mensal", "Feita"], ["Rodrigo Queiroz Moreira", "Revisão de planejamento", "Feita"], ["Sérgio Vieira Reis", "R1", "Feita"], ["Débora Cruz Duarte", "R2", "Feita"], ["Rede Vitalle Ltda", "R1", "Feita"], ["Sandra Andrade Carvalho", "R2", "Pendente"], ["Gabriel Carvalho Melo", "Revisão de planejamento", "Pendente"]], "rodape": "+ 8 outros itens"}, "receita": {"titulo": "Receita de investimentos — 114% da meta", "subtitulo": "Meta de ROA 0,75% · maiores geradores de receita", "colunas": ["Cliente", "Receita/mês", "ROA"], "linhas": [["Priscila Franco Martins", "R$ 4 mil", "0.71%"], ["Rafael Guimarães Rangel", "R$ 3 mil", "0.99%"], ["Débora Teixeira Costa", "R$ 2 mil", "0.98%"], ["Larissa Carvalho Bittencourt", "R$ 2 mil", "1.18%"], ["Bruno Ortiz Melo", "R$ 2 mil", "1.15%"], ["Camila Ferreira Iwamoto", "R$ 2 mil", "1.07%"], ["Nelson Mendes Pinheiro", "R$ 1 mil", "0.68%"], ["Beatriz Barros Costa", "R$ 1 mil", "0.74%"], ["Cristina Duarte Furtado", "R$ 1 mil", "1.04%"], ["Gabriel Oliveira Almeida", "R$ 1 mil", "1.03%"], ["Patrícia Lins Ramos", "R$ 1 mil", "0.97%"], ["Eduardo Bittencourt Rocha", "R$ 1 mil", "1.06%"], ["Laboratório Horizonte ME", "R$ 1 mil", "0.64%"], ["Patrícia Mendes Rocha", "R$ 889", "0.73%"]], "rodape": "Total no mês: R$ 36 mil · ROA da carteira 0.85%"}, "prospeccao": {"titulo": "Funil de prospecção — mês", "subtitulo": "Quantidade por fase", "colunas": ["Fase", "Quantidade"], "linhas": [["Novos prospects", "48"], ["R1", "28"], ["R2", "13"], ["Contas abertas", "10"], ["Captação líquida", "R$ 2.7 mi"]], "rodape": "Meta de captação R$ 4.0 mi · 67% atingido"}, "captacao": {"titulo": "Captação líquida — 67% da meta", "subtitulo": "Contas abertas / aportes no mês", "colunas": ["Cliente", "Aporte"], "linhas": [["Kátia Pacheco Cardoso", "R$ 145 mil"], ["Otávio Melo Salles", "R$ 321 mil"], ["Sérgio Queiroz Queiroz", "R$ 110 mil"], ["Larissa Andrade Franco", "R$ 273 mil"], ["Débora Teixeira Costa", "R$ 204 mil"], ["Mariana Lins Iwamoto", "R$ 263 mil"], ["Beatriz Melo Rezende", "R$ 323 mil"], ["Isabela Duarte Carvalho", "R$ 197 mil"], ["Construtora Solaris ME", "R$ 219 mil"], ["Marcos Rezende Vieira", "R$ 272 mil"]], "rodape": "Total R$ 2.7 mi de R$ 4.0 mi"}, "seguros": {"titulo": "Seguros — 4 em aberto", "subtitulo": "Negócios em aberto no ecossistema", "colunas": ["Cliente", "Tipo", "Instituição", "Valor ref.", "Status"], "linhas": [["Bruno Ortiz Melo", "Vida", "SulAmérica", "R$ 381 mil", "Em negociação"], ["Isabela Domingues Reis", "Saúde", "SulAmérica", "R$ 92 mil", "Em negociação"], ["Patrícia Lins Ramos", "Vida", "Prudential", "R$ 346 mil", "Proposta enviada"], ["Otávio Domingues Gomes", "Saúde", "MetLife", "R$ 310 mil", "Em negociação"]], "rodape": ""}, "cambio": {"titulo": "Câmbio — 3 em aberto", "subtitulo": "Negócios em aberto no ecossistema", "colunas": ["Cliente", "Tipo", "Instituição", "Valor ref.", "Status"], "linhas": [["João Bandeira Sampaio", "Remessa", "Safra", "R$ 250 mil", "Aguardando"], ["Rafael Guimarães Rangel", "Comercial", "Oribank", "R$ 317 mil", "Aguardando"], ["Ricardo Rangel Luz", "Remessa", "Oribank", "R$ 287 mil", "Em negociação"]], "rodape": ""}, "consorcio": {"titulo": "Consórcio — 4 em aberto", "subtitulo": "Negócios em aberto no ecossistema", "colunas": ["Cliente", "Tipo", "Instituição", "Valor ref.", "Status"], "linhas": [["Gabriel Oliveira Almeida", "Veículo", "Porto Seguro", "R$ 282 mil", "Em negociação"], ["Distribuidora Vanguarda S.A.", "Imóvel", "Porto Seguro", "R$ 279 mil", "Aguardando"], ["Beatriz Barros Costa", "Veículo", "Porto Seguro", "R$ 348 mil", "Em negociação"], ["Laboratório Horizonte ME", "Veículo", "Embracon", "R$ 30 mil", "Proposta enviada"]], "rodape": ""}, "credito_pf": {"titulo": "Crédito PF — 2 em aberto", "subtitulo": "Negócios em aberto no ecossistema", "colunas": ["Cliente", "Tipo", "Instituição", "Valor ref.", "Status"], "linhas": [["Eduardo Bittencourt Rocha", "Crédito c/ garantia", "Itaú", "R$ 184 mil", "Proposta enviada"], ["Clínica Vanguarda EIRELI", "Fin. Veículo", "Itaú", "R$ 390 mil", "Em negociação"]], "rodape": ""}, "receita_eco": {"titulo": "Receita do ecossistema — 83% da meta", "subtitulo": "Receita no mês por segmento", "colunas": ["Segmento", "Receita/mês"], "linhas": [["Seguros", "R$ 14 mil"], ["Consórcio", "R$ 5 mil"], ["Câmbio", "R$ 2 mil"], ["Crédito", "R$ 12 mil"]], "rodape": "Total R$ 33 mil de R$ 40 mil"}}, "sugestoes": ["Como está a captação líquida da equipe este mês?", "Qual assessor tem mais oportunidades pendentes?", "Ranking de receita por assessor na unidade."], "chats": [{"data": "Hoje", "titulo": "Gargalos do funil da equipe"}, {"data": "Ontem", "titulo": "Quem está atrás na régua de reuniões"}, {"data": "11/07", "titulo": "Metas de ecossistema por assessor"}], "notificacoes": [{"quando": "Hoje", "hora": "09:30", "titulo": "Funil da unidade", "corpo": "Conversão R1→R2 caiu para 48% (era 57% no mês passado). Vale revisar a qualidade das primeiras reuniões com o time."}, {"quando": "Hoje", "hora": "16:00", "titulo": "Ecossistema", "corpo": "A unidade está em 71% da meta de receita de ecossistema. Câmbio é o segmento com mais negócios em aberto (9)."}, {"quando": "Ontem", "hora": "13:00", "titulo": "Atenção na régua", "corpo": "3 assessores estão abaixo de 60% das reuniões previstas no mês. Márcio e Sofia puxam o índice para baixo — sugiro alinhamento hoje."}, {"quando": "Ontem", "hora": "16:00", "titulo": "Ecossistema", "corpo": "A unidade está em 71% da meta de receita de ecossistema. Câmbio é o segmento com mais negócios em aberto (9)."}, {"quando": "2 dias atrás", "hora": "08:00", "titulo": "Panorama da equipe", "corpo": "A unidade São Paulo está com 62% da meta de captação do mês (R$ 2,5 mi de R$ 4 mi). 2 assessores concentram as contas em fechamento."}, {"quando": "2 dias atrás", "hora": "09:30", "titulo": "Funil da unidade", "corpo": "Conversão R1→R2 caiu para 48% (era 57% no mês passado). Vale revisar a qualidade das primeiras reuniões com o time."}, {"quando": "3 dias atrás", "hora": "08:00", "titulo": "Panorama da equipe", "corpo": "A unidade São Paulo está com 62% da meta de captação do mês (R$ 2,5 mi de R$ 4 mi). 2 assessores concentram as contas em fechamento."}, {"quando": "3 dias atrás", "hora": "09:30", "titulo": "Funil da unidade", "corpo": "Conversão R1→R2 caiu para 48% (era 57% no mês passado). Vale revisar a qualidade das primeiras reuniões com o time."}]}, "gestao": {"nivel": "Gestão", "nome": "Gestão KAT", "primeiro": "Gestor", "escopo_desc": "Visão geral · 5 unidades · 20 assessores", "n_clientes": 300, "n_assessores": 20, "pl": 274297234, "investimentos": {"oportunidades": {"feito": 29, "total": 42}, "vencimentos": {"feito": 11, "total": 16}, "reunioes": {"feito": 80, "total": 100}, "receita": {"pct": 116, "valor": 198922, "roa": 0.87}}, "prospeccao": {"funil": [{"fase": "Novos prospects", "valor": 220}, {"fase": "R1", "valor": 135}, {"fase": "R2", "valor": 79}, {"fase": "Contas abertas", "valor": 57}], "conversoes": [61, 59, 72], "captacao": {"valor": 17955000, "meta": 20000000, "pct": 90}}, "ecossistema": {"seguros": 14, "cambio": 11, "consorcio": 11, "credito_pf": 12, "receita": {"pct": 83, "valor": 165426, "meta": 200000}}, "urgentes": {"modo": "consolidado", "por": "unidade", "periodos": {"dia": [{"nome": "Uberlândia", "vencimentos": 4, "reunioes": 3, "tarefas": 3, "oportunidades": 3, "atrasados": 1}, {"nome": "São Paulo", "vencimentos": 3, "reunioes": 5, "tarefas": 3, "oportunidades": 3, "atrasados": 3}, {"nome": "São Paulo 2", "vencimentos": 3, "reunioes": 4, "tarefas": 1, "oportunidades": 1, "atrasados": 1}, {"nome": "Jundiaí", "vencimentos": 2, "reunioes": 4, "tarefas": 1, "oportunidades": 3, "atrasados": 1}, {"nome": "Florianópolis", "vencimentos": 2, "reunioes": 2, "tarefas": 3, "oportunidades": 3, "atrasados": 3}], "semana": [{"nome": "Uberlândia", "vencimentos": 16, "reunioes": 13, "tarefas": 12, "oportunidades": 11, "atrasados": 2}, {"nome": "São Paulo", "vencimentos": 12, "reunioes": 18, "tarefas": 12, "oportunidades": 10, "atrasados": 4}, {"nome": "São Paulo 2", "vencimentos": 13, "reunioes": 16, "tarefas": 6, "oportunidades": 5, "atrasados": 2}, {"nome": "Jundiaí", "vencimentos": 9, "reunioes": 16, "tarefas": 5, "oportunidades": 11, "atrasados": 2}, {"nome": "Florianópolis", "vencimentos": 10, "reunioes": 10, "tarefas": 10, "oportunidades": 10, "atrasados": 4}], "mes": [{"nome": "Uberlândia", "vencimentos": 51, "reunioes": 43, "tarefas": 39, "oportunidades": 36, "atrasados": 2}, {"nome": "São Paulo", "vencimentos": 40, "reunioes": 60, "tarefas": 39, "oportunidades": 33, "atrasados": 7}, {"nome": "São Paulo 2", "vencimentos": 43, "reunioes": 53, "tarefas": 19, "oportunidades": 17, "atrasados": 2}, {"nome": "Jundiaí", "vencimentos": 30, "reunioes": 52, "tarefas": 15, "oportunidades": 34, "atrasados": 2}, {"nome": "Florianópolis", "vencimentos": 32, "reunioes": 31, "tarefas": 34, "oportunidades": 33, "atrasados": 7}]}}, "detalhe": {"oportunidades": {"titulo": "Oportunidades — 29/42", "subtitulo": "Realocações da mesa no mês", "colunas": ["Cliente", "Produto", "Status"], "linhas": [["Camila Reis Queiroz", "Fundo Cambial", "Realizada"], ["Leonardo Domingues Ferreira", "Tesouro Prefixado 2031", "Realizada"], ["Holding Nova Era EIRELI", "COE Índices Globais", "Realizada"], ["Luciana Carvalho Rezende", "CDB Pré 2028", "Realizada"], ["Comércio de Cristal S.A.", "Fundo Cambial", "Realizada"], ["Ricardo Oliveira Guimarães", "Fundo Cambial", "Realizada"], ["Beatriz Domingues Luz", "LCA + CRA", "Realizada"], ["Consultoria Nova Era Ltda", "PGBL Icatu", "Realizada"], ["Márcio Melo Ribeiro", "Realocação IPCA+", "Realizada"], ["Paula Furtado Ramos", "Fundo Cambial", "Realizada"], ["Otávio Martins Domingues", "PGBL Icatu", "Realizada"], ["Fábio Duarte Furtado", "LCA + CRA", "Realizada"], ["Elisa Sampaio Vasconcelos", "COE Índices Globais", "Realizada"], ["Bianca Pinheiro Guimarães", "LCA + CRA", "Realizada"]], "rodape": "+ 28 outros itens"}, "vencimentos": {"titulo": "Vencimentos — 11/16", "subtitulo": "Reaplicações no mês", "colunas": ["Cliente", "Ativo", "Valor", "Status"], "linhas": [["Lívia Braga Moreira", "CRA Raízen 2027", "R$ 110 mil", "Reaplicado"], ["Juliana Bandeira Andrade", "LCI Bradesco 92% CDI", "R$ 520 mil", "Reaplicado"], ["André Domingues Guimarães", "CDB Banco Master IPCA+", "R$ 630 mil", "Reaplicado"], ["Renata Costa Ramos", "Tesouro IPCA+ 2029", "R$ 410 mil", "Reaplicado"], ["Sofia Cardoso Barros", "Debênture Sabesp", "R$ 390 mil", "Reaplicado"], ["Patrícia Gomes Almeida", "Debênture Sabesp", "R$ 100 mil", "Reaplicado"], ["Juliana Duarte Teixeira", "CDB Banco Master IPCA+", "R$ 690 mil", "Reaplicado"], ["Leonardo Salles Prado", "CDB BTG Prefixado", "R$ 850 mil", "Reaplicado"], ["Aline Vasconcelos Braga", "CDB Banco Master IPCA+", "R$ 460 mil", "Reaplicado"], ["Gabriel Carvalho Melo", "CDB BTG Prefixado", "R$ 600 mil", "Reaplicado"], ["Marcos Vieira Sampaio", "CDB Banco Master IPCA+", "R$ 50 mil", "Reaplicado"], ["Roberto Sampaio Pinheiro", "LCA Safra 96% CDI", "R$ 190 mil", "Pendente"], ["Bruno Bittencourt Domingues", "CDB Banco Master IPCA+", "R$ 890 mil", "Pendente"], ["Elisa Vasconcelos Pinheiro", "CRI Direcional", "R$ 360 mil", "Pendente"]], "rodape": "+ 2 outros itens"}, "reunioes": {"titulo": "Reuniões — 80/100", "subtitulo": "Meta de 4 reuniões por cliente ao ano", "colunas": ["Cliente", "Tipo", "Status"], "linhas": [["Leonardo Guimarães Vieira", "Revisão de planejamento", "Feita"], ["Débora Prado Moreira", "R2", "Feita"], ["Tecnologia Horizonte S.A.", "Acompanhamento trimestral", "Feita"], ["Larissa Bandeira Mendes", "R2", "Feita"], ["Rede Solaris Ltda", "Revisão de planejamento", "Feita"], ["Larissa Lacerda Rocha", "R2", "Feita"], ["Débora Barros Ferreira", "Acompanhamento trimestral", "Feita"], ["Leonardo Fonseca Braga", "Acompanhamento trimestral", "Feita"], ["Construtora Solaris ME", "Acompanhamento trimestral", "Feita"], ["Felipe Vasconcelos Iwamoto", "Acompanhamento trimestral", "Feita"], ["Indústria Horizonte EIRELI", "Revisão de planejamento", "Feita"], ["Rafael Furtado Sampaio", "R1", "Feita"], ["Ricardo Guimarães Gomes", "Revisão de planejamento", "Feita"], ["Camila Ferreira Iwamoto", "R1", "Feita"]], "rodape": "+ 86 outros itens"}, "receita": {"titulo": "Receita de investimentos — 116% da meta", "subtitulo": "Meta de ROA 0,75% · maiores geradores de receita", "colunas": ["Cliente", "Receita/mês", "ROA"], "linhas": [["Fábio Prado Rocha", "R$ 12 mil", "0.99%"], ["Leonardo Guimarães Vieira", "R$ 9 mil", "1.13%"], ["Isabela Barros Teixeira", "R$ 6 mil", "1.07%"], ["Kátia Vieira Martins", "R$ 5 mil", "0.96%"], ["Priscila Franco Martins", "R$ 4 mil", "0.71%"], ["Transportadora Horizonte Ltda", "R$ 4 mil", "1.13%"], ["Beatriz Duarte Lacerda", "R$ 4 mil", "0.72%"], ["Rafael Guimarães Rangel", "R$ 3 mil", "0.99%"], ["Marcos Antunes Braga", "R$ 3 mil", "1.36%"], ["Juliana Bandeira Andrade", "R$ 3 mil", "1.05%"], ["Bruno Lacerda Reis", "R$ 3 mil", "0.62%"], ["Beatriz Guimarães Ribeiro", "R$ 3 mil", "1.01%"], ["Sandra Melo Barros", "R$ 3 mil", "0.62%"], ["Márcio Melo Ribeiro", "R$ 2 mil", "0.82%"]], "rodape": "Total no mês: R$ 199 mil · ROA da carteira 0.87%"}, "prospeccao": {"titulo": "Funil de prospecção — mês", "subtitulo": "Quantidade por fase", "colunas": ["Fase", "Quantidade"], "linhas": [["Novos prospects", "220"], ["R1", "135"], ["R2", "79"], ["Contas abertas", "57"], ["Captação líquida", "R$ 18.0 mi"]], "rodape": "Meta de captação R$ 20.0 mi · 90% atingido"}, "captacao": {"titulo": "Captação líquida — 90% da meta", "subtitulo": "Contas abertas / aportes no mês", "colunas": ["Cliente", "Aporte"], "linhas": [["Sérgio Queiroz Queiroz", "R$ 318 mil"], ["Priscila Pacheco Franco", "R$ 133 mil"], ["Beatriz Ramos Guimarães", "R$ 125 mil"], ["Kátia Mendes Luz", "R$ 175 mil"], ["Marcos Antunes Braga", "R$ 183 mil"], ["Construtora Atlântico S.A.", "R$ 321 mil"], ["Sérgio Vieira Reis", "R$ 110 mil"], ["Larissa Barros Mendes", "R$ 80 mil"], ["Sofia Ferreira Pacheco", "R$ 296 mil"], ["Roberto Pacheco Vieira", "R$ 340 mil"], ["Roberto Rezende Alves", "R$ 246 mil"], ["Henrique Barros Lins", "R$ 293 mil"], ["Sandra Dias Rocha", "R$ 235 mil"], ["Marcos Werneck Rocha", "R$ 259 mil"]], "rodape": "Total R$ 18.0 mi de R$ 20.0 mi"}, "seguros": {"titulo": "Seguros — 14 em aberto", "subtitulo": "Negócios em aberto no ecossistema", "colunas": ["Cliente", "Tipo", "Instituição", "Valor ref.", "Status"], "linhas": [["Logística Delta S.A.", "Saúde", "Icatu", "R$ 348 mil", "Em negociação"], ["Marcelo Guimarães Costa", "Patrimonial", "Icatu", "R$ 147 mil", "Em negociação"], ["Marcos Rezende Vieira", "Vida", "MetLife", "R$ 295 mil", "Aguardando"], ["Cristina Duarte Furtado", "Saúde", "SulAmérica", "R$ 377 mil", "Em negociação"], ["Márcio Vieira Dias", "Vida", "MetLife", "R$ 144 mil", "Proposta enviada"], ["Renata Alves Queiroz", "Vida", "Icatu", "R$ 106 mil", "Em negociação"], ["Paula Prado Franco", "Vida", "SulAmérica", "R$ 114 mil", "Aguardando"], ["Construtora Nova Era EIRELI", "Patrimonial", "Icatu", "R$ 190 mil", "Aguardando"], ["Logística Progresso ME", "Vida", "MetLife", "R$ 205 mil", "Proposta enviada"], ["Rafael Reis Guimarães", "Saúde", "SulAmérica", "R$ 122 mil", "Proposta enviada"], ["Larissa Carvalho Bittencourt", "Vida", "Icatu", "R$ 199 mil", "Em negociação"], ["Renata Ribeiro Iwamoto", "Vida", "Icatu", "R$ 382 mil", "Proposta enviada"], ["Kátia Pacheco Cardoso", "Vida", "Icatu", "R$ 324 mil", "Em negociação"], ["Tatiane Werneck Vasconcelos", "Patrimonial", "SulAmérica", "R$ 196 mil", "Proposta enviada"]], "rodape": ""}, "cambio": {"titulo": "Câmbio — 11 em aberto", "subtitulo": "Negócios em aberto no ecossistema", "colunas": ["Cliente", "Tipo", "Instituição", "Valor ref.", "Status"], "linhas": [["Carlos Sampaio Prado", "Turismo", "Safra", "R$ 208 mil", "Proposta enviada"], ["Rafael Guimarães Rangel", "Remessa", "Safra", "R$ 164 mil", "Proposta enviada"], ["Ricardo Costa Gomes", "Comercial", "Safra", "R$ 359 mil", "Aguardando"], ["Diego Lacerda Bittencourt", "Turismo", "Oribank", "R$ 340 mil", "Proposta enviada"], ["Gustavo Domingues Melo", "Remessa", "Oribank", "R$ 376 mil", "Em negociação"], ["Marcelo Lacerda Bittencourt", "Remessa", "Oribank", "R$ 103 mil", "Em negociação"], ["Gustavo Moreira Pacheco", "Turismo", "Oribank", "R$ 222 mil", "Em negociação"], ["Fábio Oliveira Mendes", "Comercial", "Oribank", "R$ 373 mil", "Aguardando"], ["Lívia Melo Almeida", "Comercial", "Oribank", "R$ 160 mil", "Em negociação"], ["Juliana Fonseca Barros", "Turismo", "Safra", "R$ 58 mil", "Aguardando"], ["Renata Lins Ribeiro", "Comercial", "Safra", "R$ 65 mil", "Aguardando"]], "rodape": ""}, "consorcio": {"titulo": "Consórcio — 11 em aberto", "subtitulo": "Negócios em aberto no ecossistema", "colunas": ["Cliente", "Tipo", "Instituição", "Valor ref.", "Status"], "linhas": [["Carlos Pinheiro Nunes", "Imóvel", "Porto Seguro", "R$ 84 mil", "Em negociação"], ["Nelson Queiroz Andrade", "Veículo", "Embracon", "R$ 248 mil", "Em negociação"], ["Aline Costa Pinheiro", "Imóvel", "Embracon", "R$ 88 mil", "Aguardando"], ["Rede Vitalle Ltda", "Imóvel", "Embracon", "R$ 387 mil", "Aguardando"], ["Transportadora Atlântico ME", "Veículo", "Embracon", "R$ 136 mil", "Em negociação"], ["Priscila Ramos Fonseca", "Imóvel", "Porto Seguro", "R$ 235 mil", "Em negociação"], ["Débora Werneck Lacerda", "Veículo", "Embracon", "R$ 80 mil", "Aguardando"], ["Isabela Rocha Moreira", "Veículo", "Embracon", "R$ 204 mil", "Aguardando"], ["Patrícia Lins Ramos", "Veículo", "Embracon", "R$ 334 mil", "Proposta enviada"], ["Rodrigo Andrade Rangel", "Imóvel", "Porto Seguro", "R$ 95 mil", "Em negociação"], ["Helena Duarte Teixeira", "Imóvel", "Porto Seguro", "R$ 214 mil", "Em negociação"]], "rodape": ""}, "credito_pf": {"titulo": "Crédito PF — 12 em aberto", "subtitulo": "Negócios em aberto no ecossistema", "colunas": ["Cliente", "Tipo", "Instituição", "Valor ref.", "Status"], "linhas": [["Construtora Ipê S.A.", "Crédito c/ garantia", "Santander", "R$ 199 mil", "Em negociação"], ["Felipe Ribeiro Barros", "Crédito c/ garantia", "Santander", "R$ 165 mil", "Aguardando"], ["Logística São Jorge S.A.", "Crédito c/ garantia", "Safra", "R$ 194 mil", "Em negociação"], ["Eduardo Pinheiro Mendes", "Crédito c/ garantia", "Inter", "R$ 286 mil", "Em negociação"], ["Eduardo Iwamoto Pacheco", "Fin. Veículo", "Bradesco", "R$ 380 mil", "Aguardando"], ["Thiago Werneck Duarte", "Crédito c/ garantia", "Inter", "R$ 261 mil", "Proposta enviada"], ["Fábio Cruz Bittencourt", "Crédito c/ garantia", "Inter", "R$ 213 mil", "Proposta enviada"], ["Tecnologia Delta EIRELI", "Crédito c/ garantia", "Inter", "R$ 123 mil", "Proposta enviada"], ["Kátia Queiroz Rocha", "Crédito c/ garantia", "Bradesco", "R$ 290 mil", "Em negociação"], ["Laboratório Horizonte ME", "Crédito c/ garantia", "Inter", "R$ 360 mil", "Aguardando"], ["Marcos Barros Rocha", "Crédito c/ garantia", "Safra", "R$ 133 mil", "Em negociação"], ["Bruno Almeida Rezende", "Crédito c/ garantia", "Safra", "R$ 148 mil", "Proposta enviada"]], "rodape": ""}, "receita_eco": {"titulo": "Receita do ecossistema — 83% da meta", "subtitulo": "Receita no mês por segmento", "colunas": ["Segmento", "Receita/mês"], "linhas": [["Seguros", "R$ 67 mil"], ["Consórcio", "R$ 22 mil"], ["Câmbio", "R$ 10 mil"], ["Crédito", "R$ 67 mil"]], "rodape": "Total R$ 165 mil de R$ 200 mil"}}, "sugestoes": ["Compare a receita entre as 5 unidades este mês.", "Qual unidade tem maior penetração de ecossistema?", "Onde estamos perdendo mais oportunidades da mesa?"], "chats": [{"data": "Hoje", "titulo": "Receita por unidade — julho"}, {"data": "Ontem", "titulo": "Penetração de ecossistema x meta"}, {"data": "10/07", "titulo": "Conversão do funil por unidade"}], "notificacoes": [{"quando": "Hoje", "hora": "08:00", "titulo": "Visão geral", "corpo": "Receita consolidada do mês em R$ 274 mil (ROA médio 0,71%). Jundiaí lidera em receita; Florianópolis puxa a média para baixo."}, {"quando": "Hoje", "hora": "16:00", "titulo": "Comparativo de unidades", "corpo": "Diferença de ROA entre a melhor e a pior unidade chegou a 0,3 p.p. Recomendo replicar a rotina de vencimentos de Uberlândia."}, {"quando": "Ontem", "hora": "13:00", "titulo": "Ecossistema", "corpo": "Penetração média do ecossistema em 39% — apenas 25 clientes aptos (≥60%). Maior oportunidade: seguros e câmbio na base PF de alto AUC."}, {"quando": "Ontem", "hora": "16:00", "titulo": "Comparativo de unidades", "corpo": "Diferença de ROA entre a melhor e a pior unidade chegou a 0,3 p.p. Recomendo replicar a rotina de vencimentos de Uberlândia."}, {"quando": "2 dias atrás", "hora": "16:00", "titulo": "Comparativo de unidades", "corpo": "Diferença de ROA entre a melhor e a pior unidade chegou a 0,3 p.p. Recomendo replicar a rotina de vencimentos de Uberlândia."}, {"quando": "3 dias atrás", "hora": "13:00", "titulo": "Ecossistema", "corpo": "Penetração média do ecossistema em 39% — apenas 25 clientes aptos (≥60%). Maior oportunidade: seguros e câmbio na base PF de alto AUC."}, {"quando": "3 dias atrás", "hora": "16:00", "titulo": "Comparativo de unidades", "corpo": "Diferença de ROA entre a melhor e a pior unidade chegou a 0,3 p.p. Recomendo replicar a rotina de vencimentos de Uberlândia."}]}};
+let scope = "assessor";
+let periodo = "dia";
+
+const $ = (s,el=document)=>el.querySelector(s);
+const esc = s => String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const brl = n=>{
+  if(n>=1e6) return "R$ "+(n/1e6).toLocaleString("pt-BR",{maximumFractionDigits:1})+" mi";
+  if(n>=1e3) return "R$ "+Math.round(n/1e3).toLocaleString("pt-BR")+" mil";
+  return "R$ "+Math.round(n).toLocaleString("pt-BR");
+};
+const nfmt = n=>n.toLocaleString("pt-BR");
+function tone(p){
+  if(p>=90) return {c:"var(--emerald)",b:"var(--emeraldb)"};
+  if(p>=70) return {c:"var(--teal)",b:"var(--tealb)"};
+  if(p>=40) return {c:"var(--amber)",b:"var(--amberb)"};
+  return {c:"var(--rose)",b:"var(--roseb)"};
+}
+const ICON={
+  op:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M17 7h4v4"/></svg>',
+  venc:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 2h6"/></svg>',
+  reun:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+  seg:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>',
+  cam:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h13l-3-3M21 16H8l3 3"/></svg>',
+  con:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>',
+  cpf:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>',
+};
+// pill horizontal (icon left) — used in the single-column Investimentos block
+function clickAttrs(key){ return key ? [' clic','',` onclick="abrirDetalhe('${key}')" title="Ver detalhamento"`] : ['','','']; }
+function pillRow(ico,lbl,valHTML,foot,pct,key){
+  const t=tone(pct); const w=Math.min(100,Math.max(6,pct)); const [c,,oc]=clickAttrs(key);
+  return `<div class="pill row${c}"${oc}>
+    <div class="fill" style="width:${w}%;background:${t.b}"></div>
+    <div class="ico" style="color:${t.c}">${ico}</div>
+    <div><div class="lbl">${lbl}</div><div class="val">${valHTML}</div><div class="foot">${foot}</div></div>
+  </div>`;
+}
+function pill(ico,lbl,valHTML,foot,pct,key){
+  const t=tone(pct); const w=Math.min(100,Math.max(6,pct)); const [c,,oc]=clickAttrs(key);
+  return `<div class="pill${c}"${oc}>
+    <div class="fill" style="width:${w}%;background:${t.b}"></div>
+    <div class="ico" style="color:${t.c};margin-bottom:8px">${ico}</div>
+    <div class="lbl">${lbl}</div><div class="val">${valHTML}</div><div class="foot">${foot}</div>
+  </div>`;
+}
+function ring(pct,lbl,valTxt,key){
+  const t=tone(pct); const r=44, C=2*Math.PI*r, off=C*(1-Math.min(100,pct)/100); const [c,,oc]=clickAttrs(key);
+  return `<div class="pill ring${c}"${oc}>
+    <div class="ringwrap"><svg viewBox="0 0 104 104">
+      <circle cx="52" cy="52" r="${r}" fill="none" stroke="var(--line)" stroke-width="11"/>
+      <circle cx="52" cy="52" r="${r}" fill="none" stroke="${t.c}" stroke-width="11" stroke-linecap="round"
+        stroke-dasharray="${C}" stroke-dashoffset="${off}" transform="rotate(-90 52 52)"/>
+    </svg><div class="pct">${pct}%</div></div>
+    <div class="rlbl">${lbl}</div><div class="rval">${valTxt}</div>
+  </div>`;
+}
+
+function renderInvest(s){
+  const i=s.investimentos, op=i.oportunidades, vp=i.vencimentos, rp=i.reunioes;
+  const opP=Math.round(100*op.feito/op.total), vpP=Math.round(100*vp.feito/vp.total), rpP=Math.round(100*rp.feito/rp.total);
+  return `<section class="block">
+    <div class="blockhd"><h2>Investimentos</h2><span class="tag">PJ1</span></div>
+    <div class="cardcol inv">
+      ${pillRow(ICON.op,"Oportunidades",`${op.feito}<small>/${op.total}</small>`,"realocações · mês",opP,'oportunidades')}
+      ${pillRow(ICON.venc,"Vencimentos",`${vp.feito}<small>/${vp.total}</small>`,"reaplicações · mês",vpP,'vencimentos')}
+      ${pillRow(ICON.reun,"Reuniões",`${rp.feito}<small>/${rp.total}</small>`,"reuniões · mês (meta 4/cliente/ano)",rpP,'reunioes')}
+      ${ring(i.receita.pct,"Receita · mês",`${brl(i.receita.valor)} · ROA ${i.receita.roa}%`,'receita')}
+    </div>
+  </section>`;
+}
+function renderProspec(s){
+  const p=s.prospeccao, f=p.funil, cv=p.conversoes, widths=[100,82,64,48];
+  let rows="";
+  f.forEach((fase,idx)=>{
+    rows+=`<div class="fbar" style="width:${widths[idx]}%;background:linear-gradient(90deg,var(--kat),var(--kat2))">
+      <span class="fn">${fase.fase}</span><span class="fv">${nfmt(fase.valor)}</span></div>`;
+    if(idx<cv.length) rows+=`<div class="conv">↓ <b>${cv[idx]}%</b> conversão</div>`;
+  });
+  const cap=p.captacao;
+  return `<section class="block">
+    <div class="blockhd"><h2>Prospecção</h2><span class="tag soft">mês</span></div>
+    <div class="cardcol prosp">
+      <div class="pill funnelcard clic" onclick="abrirDetalhe('prospeccao')" title="Ver detalhamento"><div class="funnel">${rows}</div></div>
+      <div class="grid2">
+        ${ring(cap.pct,"Captação líquida",`${brl(cap.valor)} de ${brl(cap.meta)}`,'captacao')}
+        <div class="pill clic" onclick="abrirDetalhe('captacao')" title="Ver detalhamento">
+          <div class="lbl">Meta de captação</div><div class="val">${brl(cap.meta)}</div>
+          <div class="foot">${cap.pct}% atingido · faltam ${brl(Math.max(0,cap.meta-cap.valor))}</div>
+        </div>
+      </div>
+    </div>
+  </section>`;
+}
+function renderEco(s){
+  const e=s.ecossistema, cap=Math.max(e.seguros,e.cambio,e.consorcio,e.credito_pf,1), p=v=>Math.round(100*v/cap);
+  return `<section class="block">
+    <div class="blockhd"><h2>Ecossistema</h2><span class="tag soft">em aberto</span></div>
+    <div class="cardcol eco">
+      <div class="grid2 ecogrid">
+        ${pill(ICON.seg,"Seguros",`${e.seguros}`,"negócios em aberto",p(e.seguros),'seguros')}
+        ${pill(ICON.cam,"Câmbio",`${e.cambio}`,"negócios em aberto",p(e.cambio),'cambio')}
+        ${pill(ICON.con,"Consórcio",`${e.consorcio}`,"negócios em aberto",p(e.consorcio),'consorcio')}
+        ${pill(ICON.cpf,"Crédito PF",`${e.credito_pf}`,"negócios em aberto",p(e.credito_pf),'credito_pf')}
+      </div>
+      ${ring(e.receita.pct,"Receita ecossistema · mês",`${brl(e.receita.valor)} de ${brl(e.receita.meta)}`,'receita_eco')}
+    </div>
+  </section>`;
+}
+const UC={rose:"var(--rose)",amber:"var(--amber)",violet:"var(--violet)",emerald:"var(--emerald)",blue:"var(--blue)"};
+const UB={rose:"var(--roseb)",amber:"var(--amberb)",violet:"var(--violetb)",emerald:"var(--emeraldb)",blue:"var(--blueb)"};
+function cardUrg(u){
+  return `<div class="urg">
+    <div class="bar" style="background:${UC[u.cor]}"></div>
+    <div class="ti"><div class="t">${esc(u.titulo)}</div><div class="c">${esc(u.cliente)}</div></div>
+    <div><span class="chip" style="background:${UB[u.cor]};color:${UC[u.cor]}">${u.tipo}</span><span class="when">${esc(u.quando)}</span></div>
+  </div>`;
+}
+function miniUrg(u){
+  return `<div class="umini" style="border-left-color:${UC[u.cor]}">
+    <div class="umt">${esc(u.titulo)}</div><div class="umc">${esc(u.cliente)}</div>
+    <span class="umchip" style="background:${UB[u.cor]};color:${UC[u.cor]}">${u.tipo}</span>
+  </div>`;
+}
+function cstat(cor,label,val,atr){
+  return `<div class="cstat" style="background:${UB[cor]}"><span class="cv" style="color:${UC[cor]}">${val}</span><span class="cl">${label}${atr?` · ${atr} atras.`:''}</span></div>`;
+}
+function consolCard(e){
+  const total=e.vencimentos+e.reunioes+e.tarefas+e.oportunidades;
+  return `<div class="ccard">
+    <div class="cchd"><span>${esc(e.nome)}</span><span class="cctot">${total}</span></div>
+    <div class="ccrow">
+      ${cstat('rose','Vencimentos',e.vencimentos,e.atrasados)}
+      ${cstat('violet','Reuniões',e.reunioes,0)}
+      ${cstat('amber','Tarefas',e.tarefas,0)}
+      ${cstat('emerald','Oportunidades',e.oportunidades,0)}
+    </div>
+  </div>`;
+}
+function renderUrgentes(s){
+  const u=s.urgentes; let body, sub="";
+  if(u.modo==="consolidado"){
+    sub=`<span class="hsub">consolidado por ${u.por==='unidade'?'unidade':'assessor'}</span>`;
+    body=`<div class="ucards">${u.periodos[periodo].map(consolCard).join("")}</div>`;
+  }else if(periodo==="dia"){
+    body=`<div class="ugrid">${u.dia.map(cardUrg).join("")}</div>`;
+  }else{
+    const buckets = periodo==="semana" ? u.semana : u.mes;
+    const entradas = Object.entries(buckets);
+    const cols = entradas.map(([lbl,items])=>{
+      const on = /hoje|atual/.test(lbl);
+      const corpo = items.length ? items.map(miniUrg).join("") : `<div class="uempty">—</div>`;
+      return `<div class="ucol ${on?'on':''}"><div class="ucolhd">${esc(lbl)}<span>${items.length}</span></div><div class="ucolbody">${corpo}</div></div>`;
+    }).join("");
+    body=`<div class="ucols" style="grid-template-columns:repeat(${entradas.length},1fr)">${cols}</div>`;
+  }
+  return `<section class="block">
+    <div class="blockhd" style="justify-content:space-between">
+      <h2>Pontos urgentes${sub}</h2>
+      <div class="periodsw" id="periodsw">
+        <button data-p="dia" class="${periodo==='dia'?'on':''}">Dia</button>
+        <button data-p="semana" class="${periodo==='semana'?'on':''}">Semana</button>
+        <button data-p="mes" class="${periodo==='mes'?'on':''}">Mês</button>
+      </div>
+    </div>
+    <div class="urgbody">${body}</div>
+  </section>`;
+}
+function renderActions(){
+  return `<div class="actions">
+    <button class="btn-reg" onclick="openReg()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg> Novo registro</button>
+    <button class="btn-meet" onclick="openMeet()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h7l-1 8 10-12h-7z"/></svg> Iniciar reunião</button>
+  </div>`;
+}
+function renderAI(s){
+  const sug=s.sugestoes.map(q=>`<button onclick="askAI(this)"><span class="spark">✦</span>${esc(q)}</button>`).join("");
+  const chats=s.chats.map(c=>`<a><span>${esc(c.titulo)}</span><span class="d">${esc(c.data)}</span></a>`).join("");
+  return `<div class="ai">
+    <div class="hi"><span class="spark">✦</span> Boa tarde, ${esc(s.primeiro)}! Vamos conversar.</div>
+    <div class="sub">Pergunte sobre ${s.nivel==='Assessor'?'sua carteira':s.nivel==='Team Leader'?'sua equipe':'as unidades'}. Você pode dizer:</div>
+    <div class="sugg">${sug}</div>
+    <div class="aimsgs" id="aiMsgs"></div>
+    <div class="aibar">
+      <input id="aiInput" placeholder="Perguntar à IA…" onkeydown="if(event.key==='Enter')sendAI()"/>
+      <button class="mic" title="Falar" onclick="toast('🎙️ Gravação por áudio — em breve')"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 19v3"/></svg></button>
+      <button class="snd" title="Enviar" onclick="sendAI()"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></svg></button>
+    </div>
+    <div class="chats"><div class="ch-h"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg> Conversas salvas</div>${chats}</div>
+  </div>`;
+}
+function renderNotifs(s){
+  const byDay={}; s.notificacoes.forEach(n=>{(byDay[n.quando]=byDay[n.quando]||[]).push(n)});
+  let html='<div class="feedhd"><span class="spark">✦</span> Feed da IA · '+s.nivel+'</div>';
+  Object.keys(byDay).forEach(dia=>{
+    html+=`<div class="daylbl">${dia}</div>`;
+    byDay[dia].forEach(n=>{ html+=`<div class="notif">
+      <div class="nh"><span class="spark">✦</span> ${n.hora}</div><h3>${esc(n.titulo)}</h3><p>${esc(n.corpo)}</p>
+      <button class="reply" onclick="toast('Abrindo conversa… (protótipo)')"><span class="spark">✦</span> Responder</button></div>`; });
+  });
+  return html;
+}
+function render(){
+  const s=DATA[scope];
+  $("#scopeNome").textContent=s.nome;
+  $("#scopeDesc").textContent=s.escopo_desc;
+  $("#av").textContent=(s.primeiro[0]||"r").toLowerCase();
+  $("#app").innerHTML =
+    `<div class="cardsrow">${renderInvest(s)}${renderProspec(s)}${renderEco(s)}</div>`+
+    renderUrgentes(s)+
+    `<div class="lower"><div class="leftcol">${renderActions()}${renderAI(s)}</div><div>${renderNotifs(s)}</div></div>`;
+  const ps=$("#periodsw");
+  if(ps) ps.querySelectorAll("button").forEach(b=>b.onclick=()=>{periodo=b.dataset.p; render();});
+  renderConversa();
+}
+$("#switch").querySelectorAll("button").forEach(b=>{
+  b.onclick=()=>{$("#switch").querySelectorAll("button").forEach(x=>x.classList.remove("on"));
+    b.classList.add("on"); scope=b.dataset.s; periodo="dia"; conversa=[]; render(); window.scrollTo({top:0,behavior:"smooth"});};
+});
+
+/* -------- IA: conecta ao backend local /api/chat (Claude). Sem backend, mostra aviso. -------- */
+let conversa = [];
+function renderConversa(){
+  const box=$("#aiMsgs"); if(!box) return;
+  box.innerHTML = conversa.map(m=>`<div class="aimsg ${m.role}${m.loading?' loading':''}">${m.html?m.text:esc(m.text)}</div>`).join("");
+  box.scrollTop = box.scrollHeight;
+}
+function askAI(b){ $("#aiInput").value=b.textContent.replace('✦','').trim(); $("#aiInput").focus(); }
+async function sendAI(){
+  const inp=$("#aiInput"); const q=(inp.value||"").trim(); if(!q) return;
+  inp.value="";
+  conversa.push({role:"user",text:q});
+  const loading={role:"ai",text:"pensando…",loading:true};
+  conversa.push(loading); renderConversa();
+  try{
+    const r=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({scope, question:q, history: conversa.filter(m=>!m.loading&&!m.html).slice(-8).map(m=>({role:m.role==="ai"?"assistant":"user",content:m.text}))})});
+    const data=await r.json();
+    loading.loading=false;
+    if(data.error){ loading.text="⚠️ "+data.error; }
+    else { loading.text=data.answer||"(sem resposta)"; }
+  }catch(e){
+    loading.loading=false; loading.html=true;
+    loading.text='A IA responde quando o painel roda com o servidor local: <code>ANTHROPIC_API_KEY=... python3 servidor.py</code> na pasta <code>dashboards/</code>. Neste modo de visualização (artefato) não há backend, então esta é uma resposta de exemplo.';
+  }
+  renderConversa();
+}
+
+/* -------- folhas de registro / reunião -------- */
+const ovl=$("#ovl"), sheet=$("#sheet");
+function closeSheet(){ovl.classList.remove("open")}
+ovl.onclick=e=>{if(e.target===ovl)closeSheet()};
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closeSheet()});
+const STCOR={"Realizada":"emerald","Feita":"emerald","Reaplicado":"emerald","Pendente":"amber","Atrasado":"rose","Em negociação":"amber","Proposta enviada":"blue","Aguardando":"slate"};
+function celula(v,i){
+  if(STCOR[v]) return `<td><span class="dchip" style="background:${UB[STCOR[v]]||'var(--line)'};color:${UC[STCOR[v]]||'var(--ink2)'}">${esc(v)}</span></td>`;
+  return `<td${i===0?' class="c0"':''}>${esc(v)}</td>`;
+}
+function abrirDetalhe(key){
+  const d=(DATA[scope].detalhe||{})[key]; if(!d) return;
+  const head=d.colunas.map((c,i)=>`<th${i===0?'':' class="tr"'}>${esc(c)}</th>`).join("");
+  const rows=d.linhas.map(l=>`<tr>${l.map((c,i)=>celula(c,i)).join("")}</tr>`).join("");
+  sheet.innerHTML=`<button class="close" onclick="closeSheet()">×</button>
+    <h4 style="padding-right:28px">${esc(d.titulo)}</h4>
+    ${d.subtitulo?`<p class="dsub">${esc(d.subtitulo)}</p>`:""}
+    <div class="dtabwrap"><table class="dtab"><thead><tr>${head}</tr></thead><tbody>${rows||'<tr><td>Nada em aberto.</td></tr>'}</tbody></table></div>
+    ${d.rodape?`<div class="drod">${esc(d.rodape)}</div>`:""}`;
+  ovl.classList.add("open");
+}
+function openReg(){
+  sheet.innerHTML=`<button class="close" onclick="closeSheet()">×</button><h4>Registrar com a IA</h4>
+    <div class="optrow">${opt("Chat",'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z')}${opt("Câmera",'M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z')}${opt("Galeria",'M3 3h18v18H3zM3 15l5-5 4 4 3-3 6 6')}${opt("Áudio",'M9 2h6v12a3 3 0 0 1-6 0zM5 10a7 7 0 0 0 14 0')}</div>
+    <div class="divider"></div><h4>Registrar manualmente</h4>
+    <div class="manual">${man("Reunião")}${man("Tarefa")}${man("Oportunidade")}${man("Vencimento")}${man("Nota")}${man("Atendimento")}</div>`;
+  ovl.classList.add("open");
+}
+function openMeet(){
+  sheet.innerHTML=`<button class="close" onclick="closeSheet()">×</button><h4>Iniciar reunião</h4>
+    <p style="font-size:13px;color:var(--ink2);margin-bottom:13px">Grave ou digite o que foi falado. A IA resume, extrai insights para o AFI e cria as próximas atividades — tudo vira registro no cliente.</p>
+    <div class="meetbox"><textarea placeholder="Ex.: cliente comentou que vai vender um imóvel no 2º semestre, tem interesse em previdência para os filhos e quer revisar a exposição em bolsa…"></textarea>
+      <div class="rec"><button class="recbtn" onclick="toast('🎙️ Gravando reunião… (protótipo)')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 19v3"/></svg> Gravar áudio</button>
+      <button class="recbtn" style="background:var(--card);color:var(--kat);border:1.5px solid var(--kat)" onclick="toast('Resumo gerado e salvo no cliente (protótipo)')">Resumir e salvar</button></div>
+    </div>`;
+  ovl.classList.add("open");
+}
+function opt(l,d){return `<div class="opt" onclick="toast('${l} — abrindo (protótipo)')"><div class="ob"><svg width="27" height="27" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="${d}"/></svg></div><div class="ol">${l}</div></div>`}
+function man(l){return `<button onclick="toast('Registrar ${l} (protótipo)')">${l}</button>`}
+let tt;
+function toast(m){const t=$("#toast");t.textContent=m;t.classList.add("show");clearTimeout(tt);tt=setTimeout(()=>t.classList.remove("show"),2200)}
+render();
+</script>
