@@ -49,8 +49,11 @@ except Exception:
 # ---------------------------------------------------------------------------
 # Contexto por visão (a partir da base fictícia)
 # ---------------------------------------------------------------------------
+import re
 xl = pd.read_excel(BASE, sheet_name=None)
 cli = xl["clientes"]; ass = xl["assessores"]; reun = xl["reunioes"]
+inv = xl["investimentos"]; ser = xl["ecossistema_servicos"]
+afi = xl.get("afi_planejamento", cli.iloc[0:0]); ativ = xl.get("atividades", cli.iloc[0:0])
 
 sp = ass[(ass["unidade"] == "São Paulo") & (ass["cargo"].str.contains("Assessor"))]
 cont = cli.groupby("assessor_id").size()
@@ -65,6 +68,61 @@ def brl(v):
     if v >= 1e6: return f"R$ {v/1e6:.1f} mi"
     if v >= 1e3: return f"R$ {v/1e3:.0f} mil"
     return f"R$ {v:.0f}"
+
+# --- Vencimentos (data-base da base fictícia = 15/07/2026) ---
+HOJE = pd.Timestamp("2026-07-15")
+inv["_venc"] = pd.to_datetime(inv["vencimento"], errors="coerce")
+nome_por_id = dict(zip(cli["cliente_id"], cli["nome"]))
+
+def proximos_vencimentos(ids, dias=60, cap=30):
+    v = inv[inv["cliente_id"].isin(ids) & inv["_venc"].notna()]
+    v = v[(v["_venc"] >= HOJE) & (v["_venc"] <= HOJE + pd.Timedelta(days=dias))].sort_values("_venc")
+    if v.empty:
+        return f"Nenhum vencimento nos próximos {dias} dias."
+    linhas = []
+    for _, x in v.head(cap).iterrows():
+        nm = nome_por_id.get(x["cliente_id"], str(x["cliente_id"]))
+        ur = ult_reuniao.get(x["cliente_id"])
+        if pd.notna(ur):
+            ur_dt = pd.to_datetime(ur)
+            dias_contato = (HOJE - ur_dt).days
+            contato = f"último contato {ur_dt.strftime('%d/%m/%Y')} (há {dias_contato} dias)"
+        else:
+            contato = "sem contato registrado"
+        dias_venc = (x["_venc"] - HOJE).days
+        linhas.append(f'- vence {x["_venc"].strftime("%d/%m/%Y")} (em {dias_venc}d) · {nm} · '
+                      f'{x["ativo"]} ({x["indexador"]}) · {brl(x["valor_atual"])} · {contato}')
+    extra = len(v) - cap
+    if extra > 0:
+        linhas.append(f"(+{extra} outros vencimentos no período)")
+    return "\n".join(linhas)
+
+def ecossistema_resumo(ids, top=None):
+    s = ser[ser["cliente_id"].isin(ids) & (ser["status"] == "Ativo")]
+    if s.empty:
+        return "Nenhum serviço de ecossistema ativo no escopo."
+    por_cat = s.groupby("categoria").agg(n=("cliente_id", "count"), rec=("receita_gerada_12m", "sum")).sort_values("rec", ascending=False)
+    por_inst = s.groupby("instituicao").size().sort_values(ascending=False)
+    L = [f"Total de serviços ativos: {len(s)}.", "Por categoria (ativos · receita 12m):"]
+    for cat, r in por_cat.iterrows():
+        L.append(f"- {cat}: {int(r.n)} · {brl(r.rec)}")
+    seg = s[s["categoria"].str.startswith("Seguro")]
+    if len(seg):
+        L.append("Seguros por seguradora (ativos): " + ", ".join(f"{i} {int(n)}" for i, n in seg.groupby("instituicao").size().sort_values(ascending=False).items()))
+    L.append("Por instituição (todos os contratos ativos):")
+    items = list(por_inst.items())
+    if top:
+        items = items[:top]
+    for inst, n in items:
+        L.append(f"- {inst}: {int(n)}")
+    if top and len(por_inst) > top:
+        L.append(f"(+{len(por_inst)-top} outras instituições)")
+    return "\n".join(L)
+
+# mapas de assessor -> nome/unidade (para troca de usuário na visão Assessor)
+nome_assessor = dict(zip(ass["assessor_id"], ass["assessor"]))
+uni_assessor = dict(zip(ass["assessor_id"], ass["unidade"]))
+UNIDADES = list(dict.fromkeys(cli["unidade"]))
 
 def contexto_carteira(ids, limite=40):
     c = cli[cli["cliente_id"].isin(ids)].sort_values("patrimonio_investimentos_safra", ascending=False)
@@ -105,24 +163,116 @@ def por_unidade():
                      f'ecossistema {r.eco:.0f}%, aptos {int(r.aptos)}'
                      for u, r in g.sort_values("receita", ascending=False).iterrows())
 
-CONTEXTO = {
-    "assessor": resumo(ids_ass, f"VISÃO ASSESSOR — {ASSESSOR_NOME} (Unidade {UNIDADE})") + "\nCLIENTES DA CARTEIRA:\n" + contexto_carteira(ids_ass, 40),
-    "lider": resumo(ids_uni, f"VISÃO TEAM LEADER — Unidade {UNIDADE}") + "\nPOR ASSESSOR:\n" + por_assessor(ids_uni) + "\n\nMAIORES CLIENTES:\n" + contexto_carteira(ids_uni, 20),
-    "gestao": resumo(ids_all, "VISÃO GESTÃO — KAT (5 unidades, 20 assessores)") + "\nPOR UNIDADE:\n" + por_unidade(),
-}
+def ids_de(scope, ent=None):
+    if scope == "assessor" and ent in nome_assessor:
+        return set(cli[cli["assessor_id"] == ent]["cliente_id"])
+    if scope == "lider" and ent in set(cli["unidade"]):
+        return set(cli[cli["unidade"] == ent]["cliente_id"])
+    return {"assessor": ids_ass, "lider": ids_uni, "gestao": ids_all}.get(scope, ids_all)
+
+_ctx_cache = {}
+def contexto_de(scope, ent=None):
+    key = (scope, ent)
+    if key in _ctx_cache:
+        return _ctx_cache[key]
+    if scope == "assessor":
+        ids = ids_de("assessor", ent)
+        nome = nome_assessor.get(ent, ASSESSOR_NOME)
+        uni = uni_assessor.get(ent, UNIDADE)
+        ctx = (resumo(ids, f"VISÃO ASSESSOR — {nome} (Unidade {uni})") + "\nCLIENTES DA CARTEIRA:\n" + contexto_carteira(ids, 40)
+            + "\n\nPRÓXIMOS VENCIMENTOS (60 dias, data-base 15/07/2026):\n" + proximos_vencimentos(ids, 60)
+            + "\n\nECOSSISTEMA — SERVIÇOS ATIVOS:\n" + ecossistema_resumo(ids))
+    elif scope == "lider":
+        uni = ent if ent in set(cli["unidade"]) else UNIDADE
+        ids = set(cli[cli["unidade"] == uni]["cliente_id"])
+        ctx = (resumo(ids, f"VISÃO TEAM LEADER — Unidade {uni}") + "\nPOR ASSESSOR:\n" + por_assessor(ids) + "\n\nMAIORES CLIENTES:\n" + contexto_carteira(ids, 20)
+            + "\n\nPRÓXIMOS VENCIMENTOS (60 dias, data-base 15/07/2026):\n" + proximos_vencimentos(ids, 60)
+            + "\n\nECOSSISTEMA — SERVIÇOS ATIVOS:\n" + ecossistema_resumo(ids, top=20))
+    else:
+        ctx = (resumo(ids_all, "VISÃO GESTÃO — KAT (5 unidades, 20 assessores)") + "\nPOR UNIDADE:\n" + por_unidade()
+            + "\n\nPRÓXIMOS VENCIMENTOS (45 dias, data-base 15/07/2026):\n" + proximos_vencimentos(ids_all, 45)
+            + "\n\nECOSSISTEMA — SERVIÇOS ATIVOS:\n" + ecossistema_resumo(ids_all, top=20))
+    _ctx_cache[key] = ctx
+    return ctx
+
+_nomes_lower = [(str(r["nome"]).lower(), r["cliente_id"]) for _, r in cli.iterrows()]
+
+def detalhe_cliente(cid):
+    r = cli[cli["cliente_id"] == cid]
+    if r.empty:
+        return ""
+    r = r.iloc[0]
+    L = [f"\n=== DETALHE DO CLIENTE {r['nome']} ({cid}) ==="]
+    L.append(f"Tipo {r['tipo']} · perfil {r['perfil_investidor']} · assessor {r['assessor']} · unidade {r['unidade']} · "
+             f"cliente desde {pd.to_datetime(r['cliente_desde']).strftime('%d/%m/%Y')}")
+    L.append(f"AUC {brl(r['patrimonio_investimentos_safra'])} · ecossistema {r['pct_adesao_ecossistema']}% "
+             f"({'apto' if r['ecossistema_apto']=='Sim' else 'não apto'}) · AFI {r['tem_afi']} · receita 12m {brl(r['receita_total_12m'])}")
+    h = inv[inv["cliente_id"] == cid]
+    if len(h):
+        L.append("Carteira: " + "; ".join(f"{x['produto']} {x['ativo']} ({x['classe']}, {brl(x['valor_atual'])})" for _, x in h.head(12).iterrows()))
+    s = ser[(ser["cliente_id"] == cid) & (ser["status"] == "Ativo")]
+    if len(s):
+        L.append("Ecossistema ativo: " + "; ".join(f"{x['categoria']} — {x['instituicao']}" for _, x in s.iterrows()))
+    a = afi[afi["cliente_id"] == cid]
+    if len(a):
+        a = a.iloc[0]
+        L.append(f"AFI: renda {brl(a['renda_mensal'])}, {a['composicao_familiar']}; objetivos: {a['objetivos']}; projetos: {a['projetos']}")
+    rr = reun[reun["cliente_id"] == cid].sort_values("data", ascending=False)
+    if len(rr):
+        L.append("Reuniões (mais recentes primeiro):")
+        for _, x in rr.head(5).iterrows():
+            L.append(f"- {pd.to_datetime(x['data']).strftime('%d/%m/%Y')} [{x['tipo']}]: {x['resumo_transcricao']} "
+                     f"(insight AFI: {x['insight_afi']}; próxima ação: {x['proxima_acao']})")
+    else:
+        L.append("Reuniões: nenhuma registrada.")
+    if len(ativ):
+        at = ativ[ativ["cliente_id"] == cid]
+        if len(at):
+            L.append("Atividades da mesa: " + "; ".join(f"{x['produto']} ({x['status']})" for _, x in at.head(6).iterrows()))
+    return "\n".join(L)
+
+def buscar_cliente(pergunta, ids):
+    """Se a pergunta cita um CPF/CNPJ ou o nome de um cliente, devolve o detalhe dele."""
+    cid = None
+    m = re.search(r"\d{2,3}[.\s]?\d{3}[.\s]?\d{3}[-/]?\d{2,4}[-]?\d{0,2}", pergunta)
+    if m:
+        digs = re.sub(r"\D", "", m.group(0))
+        for c in cli["cliente_id"]:
+            if re.sub(r"\D", "", str(c)) == digs:
+                cid = c; break
+    if cid is None:
+        q = pergunta.lower()
+        for nome_l, c in _nomes_lower:
+            if len(nome_l) >= 8 and nome_l in q:
+                cid = c; break
+    if cid is None:
+        return ""
+    if cid not in ids:
+        nome = cli[cli["cliente_id"] == cid].iloc[0]["nome"]
+        return f"\n(O cliente {nome} existe, mas não pertence ao escopo/assessor desta visão — troque de visão ou de usuário para consultá-lo.)"
+    return detalhe_cliente(cid)
+
 SYSTEM = ("Você é o assistente de IA do CRM da KAT Investimentos (escritório de assessoria de investimentos). "
     "Responda em português (BR), objetivo e útil. Use SOMENTE os dados fornecidos (base fictícia de teste); "
     "se algo não estiver nos dados, diga que não há na base. Pode fazer contas, rankings e recomendações táticas. "
-    "Seja conciso.\n\n=== DADOS DA VISÃO ATUAL ===\n")
+    "Se houver um bloco 'DETALHE DO CLIENTE', use-o para responder perguntas sobre esse cliente específico "
+    "(reuniões e seus resumos, carteira, serviços do ecossistema, AFI). "
+    "Para perguntas sobre vencimentos/maturidade, use o bloco 'PRÓXIMOS VENCIMENTOS' (cada linha traz a data do vencimento, "
+    "o cliente, o ativo, o valor e a data do último contato). 'Ainda não contatado' = sem contato registrado ou último contato há muitos dias. "
+    "A data de referência (hoje) é 15/07/2026. Seja conciso.\n\n=== DADOS DA VISÃO ATUAL ===\n")
 
-def responder(scope, question, history):
+def responder(scope, question, history, ent=None):
     if anthropic is None:
         return {"error": "Biblioteca 'anthropic' não instalada no servidor."}
     if not (os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN")):
         return {"error": "Servidor sem ANTHROPIC_API_KEY configurada."}
     if not str(question).strip():
         return {"error": "Pergunta vazia."}
-    ctx = CONTEXTO.get(scope, CONTEXTO["assessor"])
+    ctx = contexto_de(scope, ent)
+    try:
+        ctx += buscar_cliente(str(question), ids_de(scope, ent))
+    except Exception:
+        pass
     msgs = [{"role": h["role"], "content": str(h["content"])[:4000]}
             for h in (history or [])[-8:] if h.get("role") in ("user","assistant") and h.get("content")]
     msgs.append({"role": "user", "content": str(question)[:4000]})
@@ -216,7 +366,7 @@ class Handler(SimpleHTTPRequestHandler):
                 data = json.loads(self.rfile.read(n) or b"{}")
             except Exception:
                 data = {}
-            return self._json(responder(data.get("scope", "assessor"), data.get("question", ""), data.get("history")))
+            return self._json(responder(data.get("scope", "assessor"), data.get("question", ""), data.get("history"), data.get("ent")))
         self.send_error(404, "Not found")
 
     def log_message(self, *a):
