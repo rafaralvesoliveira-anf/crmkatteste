@@ -471,6 +471,19 @@ def responder(scope, question, history, ent=None, area="geral"):
                "prioridade, status (etapa: Solicitação/Em andamento/Pendência/Concluído), sla_horas (prazo-alvo), data (abertura). "
                "Um ticket está com SLA estourado se (data + sla_horas) já passou de 15/07/2026 14:00 e status != Concluído. "
                "Responda sobre backlog por área, pendências, tickets em risco/vencidos e concluídos.\n\n" + ctx)
+    elif area == "comercial":
+        ctx = ("[TELA COMERCIAL/PROSPECÇÃO] Foque no funil de prospecção (etapas Novo → R1 → R2 → Conta aberta), enriquecimento "
+               "de prospects (CNPJs, atuação, região por DDD), tarefas/retornos e clientes similares da base para preparar reuniões. "
+               "Para 'clientes similares', use 'consultar' na tabela clientes (perfil_investidor, patrimonio_investimentos_safra, "
+               "num_classes_investimentos) filtrando pelo mesmo perfil.\n\n" + ctx)
+    elif area == "academy":
+        ctx = ("[KAT ACADEMY — IA TUTORA] Você é um tutor de ensino da KAT Academy. O objetivo é ENSINAR e aprofundar o "
+               "aprendizado do assessor sobre assessoria de investimentos, os produtos do ecossistema (Renda Fixa, RV, Fundos, "
+               "COE, Previdência, Seguros, Câmbio, Crédito, Consórcio), a régua de relacionamento 12+4+1, condução de reuniões "
+               "(R1/R2), planejamento financeiro pessoal e reserva de emergência, soft skills e postura profissional. "
+               "Responda de forma didática, estruturada e com exemplos práticos, como um professor. Pode usar analogias e passos. "
+               "Não precisa consultar a base de clientes a menos que o aluno peça um exemplo com dados reais; foque no conteúdo "
+               "educacional das trilhas.\n\n" + ctx)
     msgs = [{"role": h["role"], "content": str(h["content"])[:4000]}
             for h in (history or [])[-8:] if h.get("role") in ("user","assistant") and h.get("content")]
     msgs.append({"role": "user", "content": str(question)[:4000]})
@@ -497,6 +510,75 @@ def responder(scope, question, history, ent=None, area="geral"):
         return {"answer": "Não consegui concluir a consulta (muitas etapas). Tente perguntar de forma mais específica."}
     except Exception as e:
         return {"error": f"Erro ao chamar a IA: {e}"}
+
+
+# --- Enriquecimento de prospect via busca web (Claude + web_search) ---
+DDD_REGIAO = {
+    "11": "São Paulo/SP (capital e Grande SP)", "12": "Vale do Paraíba/SP", "13": "Baixada Santista/SP",
+    "14": "Bauru/Marília/SP", "15": "Sorocaba/SP", "16": "Ribeirão Preto/SP", "17": "S. J. do Rio Preto/SP",
+    "18": "Presidente Prudente/SP", "19": "Campinas/SP", "21": "Rio de Janeiro/RJ", "22": "Campos/RJ",
+    "27": "Vitória/ES", "31": "Belo Horizonte/MG", "32": "Juiz de Fora/MG", "34": "Uberlândia/MG (Triângulo Mineiro)",
+    "35": "Sul de Minas/MG", "37": "Divinópolis/MG", "38": "Montes Claros/MG", "41": "Curitiba/PR",
+    "43": "Londrina/PR", "44": "Maringá/PR", "47": "Joinville/Blumenau/SC", "48": "Florianópolis/SC",
+    "51": "Porto Alegre/RS", "54": "Caxias do Sul/RS", "61": "Brasília/DF", "62": "Goiânia/GO",
+    "31": "Belo Horizonte/MG", "71": "Salvador/BA", "81": "Recife/PE", "85": "Fortaleza/CE", "92": "Manaus/AM",
+}
+
+
+def _ddd_de(fone):
+    d = re.sub(r"\D", "", str(fone))
+    m = re.search(r"(?:55)?0?(\d{2})9?\d{3,4}\d{4}", d)
+    if m:
+        return m.group(1)
+    return d[:2] if len(d) >= 2 else ""
+
+
+def enriquecer(nome, telefone, cpf=""):
+    if anthropic is None:
+        return {"error": "Biblioteca 'anthropic' não instalada no servidor."}
+    if not (os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN")):
+        return {"error": "Servidor sem ANTHROPIC_API_KEY — enriquecimento por IA indisponível."}
+    nome = str(nome).strip()
+    if len(nome.split()) < 2:
+        return {"error": "Informe o nome completo do prospect."}
+    ddd = _ddd_de(telefone)
+    regiao_hint = DDD_REGIAO.get(ddd, "região não identificada pelo DDD")
+    sistema = (
+        "Você é um assistente de prospecção de um escritório de assessoria de investimentos. A partir do NOME COMPLETO e do "
+        "TELEFONE (o DDD indica a região) de um possível cliente, pesquise na web informações PÚBLICAS para enriquecer o cadastro. "
+        "Priorize: empresas/CNPJs em que a pessoa aparece como sócia/administradora (Receita Federal, portais de CNPJ, jucesp, etc.), "
+        "setor de atuação, cargo e a cidade/região. USE O DDD para escolher a pessoa certa quando o nome for comum "
+        "(ex.: DDD 34 = Triângulo Mineiro). Use apenas dados públicos e plausíveis; quando não tiver certeza, deixe o campo vazio e "
+        "baixe a confiança — é melhor não afirmar do que errar a pessoa. Ao final, responda APENAS com um bloco JSON, sem nenhum texto "
+        'fora dele, no formato exato: {"regiao":"", "profissao":"", "atuacao":"", "cargo":"", '
+        '"cnpjs":[{"cnpj":"", "razao":"", "setor":""}], "resumo":"", "confianca":"alta|média|baixa"}')
+    usuario = (f"Nome completo: {nome}\nTelefone: {telefone} (DDD {ddd} → {regiao_hint})"
+               + (f"\nCPF: {cpf}" if str(cpf).strip() else "") + "\nPesquise online e devolva somente o JSON.")
+    try:
+        client = anthropic.Anthropic()
+        msgs = [{"role": "user", "content": usuario}]
+        resp = None
+        for _ in range(4):
+            resp = client.messages.create(
+                model=MODELO, max_tokens=1800, system=sistema,
+                tools=[{"type": "web_search_20250305", "name": "web_search", "max_uses": 5}],
+                messages=msgs)
+            if resp.stop_reason == "pause_turn":
+                msgs = [{"role": "user", "content": usuario}, {"role": "assistant", "content": resp.content}]
+                continue
+            break
+        txt = "".join(getattr(b, "text", "") for b in resp.content if getattr(b, "type", "") == "text")
+        m = re.search(r"\{.*\}", txt, re.S)
+        enr = json.loads(m.group(0)) if m else {}
+        if not isinstance(enr, dict):
+            enr = {}
+        enr.setdefault("regiao", regiao_hint)
+        enr.setdefault("cnpjs", [])
+        enr.setdefault("atuacao", "")
+        enr["fonte"] = f"Busca web (Claude + web_search) · DDD {ddd}" + (f" · confiança {enr.get('confianca')}" if enr.get("confianca") else "")
+        return {"enrich": enr}
+    except Exception as e:
+        return {"error": f"Não foi possível enriquecer agora: {e}"}
 
 # --- limite de requisições por IP (proteção de custo, invisível p/ o usuário) ---
 _hits = collections.defaultdict(list)
@@ -582,6 +664,15 @@ class Handler(SimpleHTTPRequestHandler):
             except Exception:
                 data = {}
             return self._json(responder(data.get("scope", "assessor"), data.get("question", ""), data.get("history"), data.get("ent"), data.get("area", "geral")))
+        if self.path.split("?")[0] == "/api/enriquecer":
+            if not rate_ok(self._ip()):
+                return self._json({"error": "Muitas requisições. Aguarde alguns segundos."}, 429)
+            n = int(self.headers.get("Content-Length", 0) or 0)
+            try:
+                data = json.loads(self.rfile.read(n) or b"{}")
+            except Exception:
+                data = {}
+            return self._json(enriquecer(data.get("nome", ""), data.get("telefone", ""), data.get("cpf", "")))
         self.send_error(404, "Not found")
 
     def log_message(self, *a):
