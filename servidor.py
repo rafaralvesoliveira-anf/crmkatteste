@@ -49,11 +49,12 @@ except Exception:
 # ---------------------------------------------------------------------------
 # Contexto por visão (a partir da base fictícia)
 # ---------------------------------------------------------------------------
-import re
+import re, unicodedata
 xl = pd.read_excel(BASE, sheet_name=None)
 cli = xl["clientes"]; ass = xl["assessores"]; reun = xl["reunioes"]
 inv = xl["investimentos"]; ser = xl["ecossistema_servicos"]
 afi = xl.get("afi_planejamento", cli.iloc[0:0]); ativ = xl.get("atividades", cli.iloc[0:0])
+aten = xl.get("atendimentos", cli.iloc[0:0])
 
 sp = ass[(ass["unidade"] == "São Paulo") & (ass["cargo"].str.contains("Assessor"))]
 cont = cli.groupby("assessor_id").size()
@@ -189,7 +190,8 @@ def ids_de(scope, ent=None):
         return set(cli[cli["assessor_id"] == ent]["cliente_id"])
     if scope == "lider" and ent in set(cli["unidade"]):
         return set(cli[cli["unidade"] == ent]["cliente_id"])
-    return {"assessor": ids_ass, "lider": ids_uni, "gestao": ids_all}.get(scope, ids_all)
+    # 'investimentos' (mesa de produtos) enxerga a base toda, como Gestão
+    return {"assessor": ids_ass, "lider": ids_uni}.get(scope, ids_all)
 
 _ctx_cache = {}
 def contexto_de(scope, ent=None):
@@ -254,55 +256,245 @@ def detalhe_cliente(cid):
             L.append("Atividades da mesa: " + "; ".join(f"{x['produto']} ({x['status']})" for _, x in at.head(6).iterrows()))
     return "\n".join(L)
 
-def buscar_cliente(pergunta, ids):
-    """Se a pergunta cita um CPF/CNPJ ou o nome de um cliente, devolve o detalhe dele."""
-    cid = None
-    m = re.search(r"\d{2,3}[.\s]?\d{3}[.\s]?\d{3}[-/]?\d{2,4}[-]?\d{0,2}", pergunta)
-    if m:
-        digs = re.sub(r"\D", "", m.group(0))
-        for c in cli["cliente_id"]:
-            if re.sub(r"\D", "", str(c)) == digs:
-                cid = c; break
-    if cid is None:
-        q = pergunta.lower()
-        for nome_l, c in _nomes_lower:
-            if len(nome_l) >= 8 and nome_l in q:
-                cid = c; break
-    if cid is None:
-        return ""
-    if cid not in ids:
-        nome = cli[cli["cliente_id"] == cid].iloc[0]["nome"]
-        return f"\n(O cliente {nome} existe, mas não pertence ao escopo/assessor desta visão — troque de visão ou de usuário para consultá-lo.)"
-    return detalhe_cliente(cid)
+# ---------------------------------------------------------------------------
+# FERRAMENTAS — a IA consulta a base sozinha (tool use)
+# ---------------------------------------------------------------------------
+def _dims(df):
+    """Anexa nome/assessor/unidade do cliente, para permitir filtrar e agrupar por eles."""
+    if "cliente_id" not in df.columns:
+        return df
+    faltando = [c for c in ("nome", "assessor", "unidade") if c not in df.columns]
+    return df.merge(cli[["cliente_id"] + faltando], on="cliente_id", how="left") if faltando else df
+
+TABELAS = {
+    "clientes": cli, "investimentos": _dims(inv), "ecossistema_servicos": _dims(ser),
+    "reunioes": _dims(reun), "atividades": _dims(ativ), "atendimentos": _dims(aten),
+    "afi_planejamento": _dims(afi),
+}
+FUNCS = {"soma": "sum", "media": "mean", "contagem": "count", "min": "min", "max": "max", "contagem_unica": "nunique"}
+
+def _num(serie, valor):
+    if pd.api.types.is_datetime64_any_dtype(serie):
+        return pd.to_datetime(valor, errors="coerce", dayfirst=True)
+    if pd.api.types.is_numeric_dtype(serie):
+        try: return float(valor)
+        except Exception: return valor
+    return valor
+
+def ferramenta_consultar(ids, tabela=None, filtros=None, agrupar_por=None, metricas=None,
+                         ordenar_por=None, ordem="desc", limite=25, colunas=None):
+    df = TABELAS.get(tabela)
+    if df is None:
+        return f"Tabela '{tabela}' não existe. Disponíveis: {', '.join(TABELAS)}."
+    df = df[df["cliente_id"].isin(ids)]
+    for f in (filtros or []):
+        col, op, val = f.get("coluna"), f.get("operador", "="), f.get("valor")
+        if col not in df.columns:
+            return f"Coluna '{col}' não existe em {tabela}. Colunas: {', '.join(df.columns)}."
+        s = df[col]
+        if op == "contem":
+            df = df[s.astype(str).str.contains(str(val), case=False, na=False)]
+        elif op == "em":
+            alvos = [v.strip().lower() for v in str(val).split(",")]
+            df = df[s.astype(str).str.lower().isin(alvos)]
+        elif op in ("=", "!="):
+            if s.dtype == object:
+                igual = s.astype(str).str.lower() == str(val).lower()
+            else:
+                igual = s == _num(s, val)
+            df = df[igual if op == "=" else ~igual]
+        elif op in (">", ">=", "<", "<="):
+            v = _num(s, val)
+            df = df[{">" : s > v, ">=": s >= v, "<": s < v, "<=": s <= v}[op]]
+        else:
+            return f"Operador '{op}' inválido."
+    if df.empty:
+        return "Nenhum registro encontrado com esses filtros."
+    limite = max(1, min(int(limite or 25), 60))
+    if metricas:
+        aggs = {}
+        for m in metricas:
+            c, fn = m.get("coluna"), FUNCS.get(m.get("funcao", "soma"))
+            if c not in df.columns: return f"Coluna '{c}' não existe em {tabela}."
+            if not fn: return f"Função '{m.get('funcao')}' inválida. Use: {', '.join(FUNCS)}."
+            aggs[f"{m.get('funcao')}_{c}"] = (c, fn)
+        if agrupar_por:
+            faltam = [c for c in agrupar_por if c not in df.columns]
+            if faltam: return f"Coluna(s) {faltam} não existem em {tabela}."
+            g = df.groupby(agrupar_por).agg(**aggs)
+        else:
+            g = pd.DataFrame([{k: getattr(df[c], fn)() for k, (c, fn) in aggs.items()}])
+        alvo = ordenar_por if ordenar_por in g.columns else (g.columns[0] if len(g.columns) else None)
+        if alvo is not None:
+            g = g.sort_values(alvo, ascending=(ordem == "asc"))
+        total = len(g)
+        txt = g.head(limite).round(2).to_string()
+        if total > limite: txt += f"\n(+{total-limite} linhas omitidas de {total})"
+        return txt[:6000]
+    if ordenar_por and ordenar_por in df.columns:
+        df = df.sort_values(ordenar_por, ascending=(ordem == "asc"))
+    cols = [c for c in (colunas or []) if c in df.columns]
+    if not cols:
+        cols = list(dict.fromkeys([c for c in ("nome", "assessor", "unidade") if c in df.columns]
+                                  + [c for c in df.columns if c != "cliente_id"]))[:8]
+    total = len(df)
+    txt = df[cols].head(limite).to_string(index=False)
+    if total > limite: txt += f"\n(+{total-limite} linhas omitidas de {total})"
+    return txt[:6000]
+
+def _norm(s):
+    return unicodedata.normalize("NFKD", str(s)).encode("ascii", "ignore").decode().lower()
+
+_nomes_norm = [(_norm(r["nome"]), r["cliente_id"]) for _, r in cli.iterrows()]
+
+def ferramenta_detalhe_cliente(ids, termo=""):
+    termo = str(termo).strip()
+    if not termo:
+        return "Informe o nome (mesmo parcial) ou o CPF/CNPJ do cliente."
+    digitos = re.sub(r"\D", "", termo)
+    if len(digitos) >= 11:
+        achados = [c for c in cli["cliente_id"] if re.sub(r"\D", "", str(c)) == digitos]
+    else:
+        t = _norm(termo)
+        achados = [c for n, c in _nomes_norm if t in n]
+        if not achados:
+            toks = [x for x in t.split() if len(x) >= 3]
+            achados = [c for n, c in _nomes_norm if toks and all(tk in n for tk in toks)]
+    achados = [c for c in achados if c in ids]
+    if not achados:
+        return (f"Nenhum cliente com '{termo}' no escopo desta visão. "
+                "Ele pode existir na base mas pertencer a outro assessor/unidade.")
+    if len(achados) > 1:
+        lista = "; ".join(f'{r["nome"]} ({r["cliente_id"]})'
+                          for _, r in cli[cli["cliente_id"].isin(achados)].head(12).iterrows())
+        return (f"{len(achados)} clientes correspondem a '{termo}' neste escopo: {lista}. "
+                "Pergunte ao usuário qual deles, ou chame de novo com o nome completo/CPF.")
+    return detalhe_cliente(achados[0])[:6000]
+
+FERRAMENTAS = [
+    {
+        "name": "consultar",
+        "description": ("Consulta e agrega a base do CRM (só os clientes do escopo/visão atual). Use para QUALQUER "
+            "pergunta quantitativa: totais, rankings, contagens, médias, filtros e agrupamentos — ex.: receita de "
+            "seguros da Icatu por unidade, vencimentos dos próximos 7 dias, clientes sem reunião recente, ranking de "
+            "assessores. Sempre consulte antes de dizer que não tem a informação."),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "tabela": {"type": "string", "enum": list(TABELAS),
+                           "description": "Tabela a consultar."},
+                "filtros": {"type": "array", "description": "Filtros combinados com E.", "items": {
+                    "type": "object",
+                    "properties": {
+                        "coluna": {"type": "string"},
+                        "operador": {"type": "string", "enum": ["=", "!=", ">", ">=", "<", "<=", "contem", "em"]},
+                        "valor": {"type": "string", "description": "Valor. Datas em AAAA-MM-DD. 'em' aceita lista separada por vírgula."},
+                    },
+                    "required": ["coluna", "operador", "valor"]}},
+                "agrupar_por": {"type": "array", "items": {"type": "string"},
+                                "description": "Colunas para agrupar, ex.: ['unidade'] ou ['assessor']."},
+                "metricas": {"type": "array", "description": "O que calcular. Sem métricas, devolve as linhas.", "items": {
+                    "type": "object",
+                    "properties": {
+                        "coluna": {"type": "string"},
+                        "funcao": {"type": "string", "enum": list(FUNCS)},
+                    },
+                    "required": ["coluna", "funcao"]}},
+                "colunas": {"type": "array", "items": {"type": "string"}, "description": "Colunas a exibir quando não há métricas."},
+                "ordenar_por": {"type": "string"},
+                "ordem": {"type": "string", "enum": ["desc", "asc"]},
+                "limite": {"type": "integer", "description": "Máx. de linhas (padrão 25, teto 60)."},
+            },
+            "required": ["tabela"],
+        },
+    },
+    {
+        "name": "detalhe_cliente",
+        "description": ("Perfil completo de UM cliente: cadastro, carteira, serviços do ecossistema, AFI e o histórico de "
+            "reuniões com o resumo/transcrição de cada uma. Use para perguntas sobre um cliente citado pelo nome (mesmo "
+            "só o primeiro nome, ex.: 'beatriz') ou pelo CPF/CNPJ. Se houver mais de um, devolve a lista para escolher."),
+        "input_schema": {
+            "type": "object",
+            "properties": {"termo": {"type": "string", "description": "Nome (completo ou parcial) ou CPF/CNPJ."}},
+            "required": ["termo"],
+        },
+    },
+]
+
+def executar_ferramenta(nome, entrada, ids):
+    if nome == "consultar":
+        return ferramenta_consultar(ids, **(entrada or {}))
+    if nome == "detalhe_cliente":
+        return ferramenta_detalhe_cliente(ids, **(entrada or {}))
+    return f"Ferramenta '{nome}' não existe."
+
+ESQUEMA = """TABELAS (as ferramentas já filtram tudo para o escopo/visão atual — nunca vazam outros assessores):
+- clientes: cliente_id, nome, tipo (PF/PJ), assessor, unidade, cliente_desde, perfil_investidor, patrimonio_investimentos_safra (=AUC), num_classes_investimentos, num_servicos_ecossistema, pct_adesao_ecossistema, ecossistema_apto (Sim/Não), tem_afi, receita_investimentos_12m, receita_seguros_12m, receita_consorcio_12m, receita_cambio_12m, receita_credito_12m, receita_total_12m
+- investimentos (posições): cliente_id, nome, assessor, unidade, classe, produto, ativo, emissor_gestor, indexador, taxa, data_aplicacao, vencimento, valor_aplicado, valor_atual
+- ecossistema_servicos: cliente_id, nome, assessor, unidade, categoria (Seguro de Vida | Seguro Saúde | Seguro Patrimonial | Consórcio | Câmbio | Financiamento Imóvel | Financiamento Veículo | Corporate), subtipo, instituicao (Icatu, Porto Seguro, SulAmérica, Prudential, MetLife, Tokio Marine, Bradesco Saúde, Embracon, Itaú, Santander, Inter, Safra, Oribank, Bradesco), status (Ativo | Negado), data_contratacao, valor_referencia, receita_gerada_12m
+- reunioes: cliente_id, nome, assessor, unidade, data, tipo, canal, resumo_transcricao, insight_afi, proxima_acao
+- atividades (mesa): cliente_id, nome, assessor, unidade, data, origem, produto, valor_envolvido, receita_estimada, status, motivo
+- atendimentos: cliente_id, nome, assessor, unidade, data, area, solicitacao, prioridade, status, data_conclusao
+- afi_planejamento: cliente_id, nome, assessor, unidade, renda_mensal, estado_civil, num_dependentes, composicao_familiar, patrimonio_imobiliario, objetivos, projetos, horizonte_anos, tolerancia_risco, aporte_mensal_planejado, reserva_emergencia_meses"""
 
 SYSTEM = ("Você é o assistente de IA do CRM da KAT Investimentos (escritório de assessoria de investimentos). "
-    "Responda em português (BR), objetivo e útil. Use SOMENTE os dados fornecidos (base fictícia de teste); "
-    "se algo não estiver nos dados, diga que não há na base. Pode fazer contas, rankings e recomendações táticas. "
-    "Se houver um bloco 'DETALHE DO CLIENTE', use-o para responder perguntas sobre esse cliente específico "
-    "(reuniões e seus resumos, carteira, serviços do ecossistema, AFI). "
-    "Para perguntas sobre vencimentos/maturidade, use o bloco 'PRÓXIMOS VENCIMENTOS' (cada linha traz a data do vencimento, "
-    "o cliente, o ativo, o valor e a data do último contato). 'Ainda não contatado' = sem contato registrado ou último contato há muitos dias. "
-    "A data de referência (hoje) é 15/07/2026. Seja conciso.\n\n=== DADOS DA VISÃO ATUAL ===\n")
+    "Responda em português (BR), objetivo, conciso e útil para um assessor/gestor.\n\n"
+    "VOCÊ TEM ACESSO À BASE POR FERRAMENTAS — use-as:\n"
+    "- 'consultar': qualquer pergunta quantitativa (totais, rankings, contagens, filtros, agrupamentos). "
+    "Ex.: receita de seguros da Icatu por unidade = tabela ecossistema_servicos, filtros instituicao=Icatu e "
+    "categoria contem Seguro e status=Ativo, agrupar_por ['unidade'], metricas soma de receita_gerada_12m.\n"
+    "- 'detalhe_cliente': perguntas sobre um cliente específico (registro/resumo de reuniões, carteira, serviços, AFI). "
+    "Aceita só o primeiro nome.\n"
+    "REGRA IMPORTANTE: NUNCA diga que não tem a informação sem antes tentar a ferramenta. Só afirme que não há dado "
+    "depois que a consulta voltar vazia. Pode encadear várias consultas. Não invente números: todo valor vem da ferramenta "
+    "ou do resumo abaixo.\n"
+    "A data de referência (hoje) é 15/07/2026. Valores em R$. Base fictícia de teste.\n\n"
+    + ESQUEMA + "\n\n=== RESUMO DA VISÃO ATUAL ===\n")
 
-def responder(scope, question, history, ent=None):
+def responder(scope, question, history, ent=None, area="geral"):
     if anthropic is None:
         return {"error": "Biblioteca 'anthropic' não instalada no servidor."}
     if not (os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN")):
         return {"error": "Servidor sem ANTHROPIC_API_KEY configurada."}
     if not str(question).strip():
         return {"error": "Pergunta vazia."}
+    ids = ids_de(scope, ent)
     ctx = contexto_de(scope, ent)
-    try:
-        ctx += buscar_cliente(str(question), ids_de(scope, ent))
-    except Exception:
-        pass
+    if area == "investimentos":
+        ctx = ("[TELA INVESTIMENTOS/PRODUTOS] Foque em produtos de investimento: classes (Renda Fixa Pós/Pré/IPCA+, "
+               "Renda Variável, Fundos, COE, Previdência — a classe 'Internacional' existe na base mas ficou fora desta tela), "
+               "alocação e mix vs meta por segmento, oportunidades da mesa (tabela atividades: origem, status, receita_estimada, "
+               "motivo) e vencimentos a reaplicar. Use a ferramenta 'consultar' nas tabelas investimentos e atividades.\n\n" + ctx)
+    elif area == "tickets":
+        ctx = ("[TELA TICKETS/ATENDIMENTOS] Foque nos atendimentos às áreas operacionais. Use a ferramenta 'consultar' na tabela "
+               "'atendimentos': area (Operações RV, Operações RF, Abertura de Conta, Eventos, Reembolsos), solicitacao (tipo), "
+               "prioridade, status (etapa: Solicitação/Em andamento/Pendência/Concluído), sla_horas (prazo-alvo), data (abertura). "
+               "Um ticket está com SLA estourado se (data + sla_horas) já passou de 15/07/2026 14:00 e status != Concluído. "
+               "Responda sobre backlog por área, pendências, tickets em risco/vencidos e concluídos.\n\n" + ctx)
     msgs = [{"role": h["role"], "content": str(h["content"])[:4000]}
             for h in (history or [])[-8:] if h.get("role") in ("user","assistant") and h.get("content")]
     msgs.append({"role": "user", "content": str(question)[:4000]})
+    cliente_ia = anthropic.Anthropic()
     try:
-        resp = anthropic.Anthropic().messages.create(model=MODELO, max_tokens=1200, system=SYSTEM + ctx, messages=msgs)
-        txt = "".join(getattr(b, "text", "") for b in resp.content if getattr(b, "type", "") == "text")
-        return {"answer": txt.strip() or "(sem resposta)"}
+        for _ in range(6):  # loop de tool use: consulta a base até ter a resposta
+            resp = cliente_ia.messages.create(model=MODELO, max_tokens=1500,
+                                              system=SYSTEM + ctx, tools=FERRAMENTAS, messages=msgs)
+            if resp.stop_reason != "tool_use":
+                txt = "".join(getattr(b, "text", "") for b in resp.content if getattr(b, "type", "") == "text")
+                return {"answer": txt.strip() or "(sem resposta)"}
+            msgs.append({"role": "assistant", "content": resp.content})
+            resultados = []
+            for b in resp.content:
+                if getattr(b, "type", "") != "tool_use":
+                    continue
+                try:
+                    saida, erro = executar_ferramenta(b.name, b.input, ids), False
+                except Exception as e:
+                    saida, erro = f"Erro na consulta: {e}. Revise as colunas/filtros e tente de novo.", True
+                resultados.append({"type": "tool_result", "tool_use_id": b.id,
+                                   "content": str(saida)[:6000], "is_error": erro})
+            msgs.append({"role": "user", "content": resultados})
+        return {"answer": "Não consegui concluir a consulta (muitas etapas). Tente perguntar de forma mais específica."}
     except Exception as e:
         return {"error": f"Erro ao chamar a IA: {e}"}
 
@@ -389,7 +581,7 @@ class Handler(SimpleHTTPRequestHandler):
                 data = json.loads(self.rfile.read(n) or b"{}")
             except Exception:
                 data = {}
-            return self._json(responder(data.get("scope", "assessor"), data.get("question", ""), data.get("history"), data.get("ent")))
+            return self._json(responder(data.get("scope", "assessor"), data.get("question", ""), data.get("history"), data.get("ent"), data.get("area", "geral")))
         self.send_error(404, "Not found")
 
     def log_message(self, *a):
